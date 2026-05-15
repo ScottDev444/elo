@@ -109,7 +109,7 @@ export default function Header() {
       <header className="flex items-center justify-between bg-white px-6 py-5">
         <Link href="/" className="flex items-center gap-4">
           <img
-            src="/logo.png"
+            src="/Logo.png"
             alt="East Lothian Online"
             className="h-14 w-14 rounded-2xl object-cover"
           />
