@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -109,17 +108,15 @@ export default function Header() {
     <>
       <header className="flex items-center justify-between bg-white px-6 py-5">
         <Link href="/" className="flex items-center gap-4">
-          <Image
+          <img
             src="/logo.png"
-            alt="Logo"
-            width={56}
-            height={56}
-            className="rounded-2xl"
-            priority
+            alt="East Lothian Online"
+            className="h-14 w-14 rounded-2xl object-cover"
           />
 
           <div>
             <p className="text-sm text-neutral-500">East Lothian Online</p>
+
             <h1 className="text-lg font-semibold text-black">
               The Summer of ’26 🍦
             </h1>
