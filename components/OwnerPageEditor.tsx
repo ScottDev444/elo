@@ -832,7 +832,7 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] bg-white p-6 text-center shadow-2xl">
             <h2 className="text-2xl font-black tracking-tight text-gray-950">
-              Become a Local Partner 💚
+              Upgrade and become a Local Partner 💚
             </h2>
 
             <div className="mt-6 space-y-3 text-left">
@@ -844,6 +844,9 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
               </div>
               <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-black text-gray-900">
                 Support Local 🌳
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-black text-gray-900">
+                Early Bird Price £9.99 🐣
               </div>
             </div>
 
@@ -863,7 +866,7 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
                 onClick={() => setShowPartnerPopup(false)}
                 className="rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-black text-gray-700"
               >
-                No thanks 👋
+                No thanks, I'll stick with free 👋
               </button>
             </div>
           </div>
