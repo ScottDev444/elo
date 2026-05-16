@@ -214,8 +214,8 @@ export default async function HomePage() {
   ).slice(0, 20);
 
   const upcomingTitle = showNextWeek
-    ? "📅 Next Week in East Lothian"
-    : "🎪 This Weekend in East Lothian";
+    ? "Next Week in East Lothian 📅"
+    : "This Weekend in East Lothian 🍦";
 
   return (
     <main className="min-h-screen bg-white px-6 pb-6 pt-2 md:p-6">
@@ -251,7 +251,7 @@ export default async function HomePage() {
       {featuredPosts.length > 0 && (
         <>
           <h2 className="mb-4 mt-10 text-3xl font-black tracking-tight text-black">
-            ✨ Featured
+            Local Partners 💚
           </h2>
 
           {featuredPosts.map((post: any) => (
@@ -270,7 +270,7 @@ export default async function HomePage() {
       )}
 
       <h2 className="mb-4 mt-12 text-3xl font-black tracking-tight text-black">
-        🌞 Today in East Lothian
+        Today in East Lothian 📍
       </h2>
 
       {todayPosts.map((post: any) => (

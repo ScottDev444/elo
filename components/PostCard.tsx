@@ -9,6 +9,7 @@ type PostCardProps = {
   timeLabel?: string;
   type?: string;
   deal_price?: string | number | null;
+  isLocalPartner?: boolean;
 };
 
 export default function PostCard({
@@ -19,6 +20,7 @@ export default function PostCard({
   timeLabel,
   type,
   deal_price,
+  isLocalPartner,
 }: PostCardProps) {
   const dealLabel =
     String(type).toLowerCase() === "deal" && deal_price
@@ -46,13 +48,21 @@ export default function PostCard({
               {title}
             </p>
 
-            <p className="mt-1 text-xs text-neutral-500 md:text-sm">
-              {pageName}
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-neutral-500 md:text-sm">
+                {pageName}
+              </p>
+
+              {isLocalPartner && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700 md:text-[11px]">
+                  LP
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex shrink-0 items-center gap-3">
           {dealLabel && (
             <div className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black text-white shadow-sm md:text-sm">
               {dealLabel}
