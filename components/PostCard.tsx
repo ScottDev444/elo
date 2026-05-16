@@ -49,13 +49,11 @@ export default function PostCard({
             </p>
 
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-xs text-neutral-500 md:text-sm">
-                {pageName}
-              </p>
+              <p className="text-xs text-neutral-500 md:text-sm">{pageName}</p>
 
               {isLocalPartner && (
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700 md:text-[11px]">
-                  LP
+                  Local Partner
                 </span>
               )}
             </div>

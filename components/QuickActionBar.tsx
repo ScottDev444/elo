@@ -19,22 +19,7 @@ type SearchPost = {
   id: string;
   title: string;
   type: string;
-  groups?:
-    | {
-        name?: string;
-        slug?: string | null;
-        is_local_partner?: boolean | null;
-        local_partner?: boolean | null;
-        partner?: boolean | null;
-      }
-    | {
-        name?: string;
-        slug?: string | null;
-        is_local_partner?: boolean | null;
-        local_partner?: boolean | null;
-        partner?: boolean | null;
-      }[]
-    | null;
+  groups?: { name?: string; slug?: string | null } | { name?: string; slug?: string | null }[] | null;
 };
 
 type SearchPage = {
@@ -42,9 +27,6 @@ type SearchPage = {
   name: string;
   slug: string;
   page_type?: string | null;
-  is_local_partner?: boolean | null;
-  local_partner?: boolean | null;
-  partner?: boolean | null;
 };
 
 type SearchResult =
@@ -130,28 +112,27 @@ export default function QuickActionBar() {
       const [pageResult, postResult] = await Promise.all([
         supabase
           .from("groups")
-          .select(
-            "id, name, slug, page_type, is_local_partner, local_partner, partner",
-          )
+          .select("id, name, slug, page_type")
           .eq("status", "approved")
           .or(
-            `name.ilike.%${cleaned}%,description.ilike.%${cleaned}%,page_type.ilike.%${cleaned}%`,
+            `name.ilike.%${cleaned}%,description.ilike.%${cleaned}%,page_type.ilike.%${cleaned}%`
           )
           .limit(8),
 
         supabase
           .from("posts")
-          .select(
-            `
+          .select(`
             id,
             title,
             type,
-            groups(name, slug, is_local_partner, local_partner, partner)
-          `,
-          )
+            groups(name, slug)
+          `)
           .or(`title.ilike.%${cleaned}%,type.ilike.%${cleaned}%`)
           .limit(12),
       ]);
+
+      if (pageResult.error) console.error(pageResult.error.message);
+      if (postResult.error) console.error(postResult.error.message);
 
       setPages((pageResult.data ?? []) as SearchPage[]);
       setPosts((postResult.data ?? []) as SearchPost[]);
@@ -192,20 +173,6 @@ export default function QuickActionBar() {
     return Array.isArray(post.groups) ? post.groups[0] : post.groups;
   }
 
-  function isLocalPartner(
-    value?: {
-      is_local_partner?: boolean | null;
-      local_partner?: boolean | null;
-      partner?: boolean | null;
-    } | null,
-  ) {
-    return !!(
-      value?.is_local_partner ||
-      value?.local_partner ||
-      value?.partner
-    );
-  }
-
   function isEastLothianOnlinePost(post: SearchPost) {
     const group = getPostGroup(post);
     return (
@@ -234,22 +201,9 @@ export default function QuickActionBar() {
 
       if (aIsEloPost !== bIsEloPost) return aIsEloPost ? 1 : -1;
 
-      const aPartner =
-        a.kind === "page"
-          ? isLocalPartner(a.page)
-          : isLocalPartner(getPostGroup(a.post));
-      const bPartner =
-        b.kind === "page"
-          ? isLocalPartner(b.page)
-          : isLocalPartner(getPostGroup(b.post));
-
-      if (aPartner !== bPartner) return aPartner ? -1 : 1;
-
       return typeRank(a) - typeRank(b);
     });
   }, [pages, posts]);
-
-  const hasResults = results.length > 0;
 
   if (!isMobile) return null;
 
@@ -278,7 +232,7 @@ export default function QuickActionBar() {
             >
               <Icon size={22} className="text-black" />
             </Link>
-          ),
+          )
         )}
       </nav>
 
@@ -328,16 +282,14 @@ export default function QuickActionBar() {
               <p className="text-sm font-semibold text-neutral-500">
                 Searching...
               </p>
-            ) : hasResults ? (
+            ) : results.length > 0 ? (
               <div className="space-y-2">
                 {results.map((result) => {
                   if (result.kind === "page") {
-                    const page = result.page;
-
                     return (
                       <Link
-                        key={`page-${page.id}`}
-                        href={`/${page.slug}`}
+                        key={`page-${result.page.id}`}
+                        href={`/${result.page.slug}`}
                         onClick={() => setSearchOpen(false)}
                         className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
                       >
@@ -347,11 +299,12 @@ export default function QuickActionBar() {
                           </div>
 
                           <div>
-                            <p className="font-bold text-black">{page.name}</p>
+                            <p className="font-bold text-black">
+                              {result.page.name}
+                            </p>
 
                             <p className="text-xs text-neutral-500">
-                              {isLocalPartner(page) ? "Local Partner · " : ""}
-                              {page.page_type ?? "Page"}
+                              {result.page.page_type ?? "Page"}
                             </p>
                           </div>
                         </div>
@@ -362,10 +315,8 @@ export default function QuickActionBar() {
                   }
 
                   const post = result.post;
-                  const isAlert =
-                    post.type === "update" || post.type === "alert";
                   const group = getPostGroup(post);
-                  const groupName = group?.name ?? "East Lothian";
+                  const isAlert = post.type === "update" || post.type === "alert";
 
                   return (
                     <Link
@@ -393,8 +344,7 @@ export default function QuickActionBar() {
                           <p className="font-bold text-black">{post.title}</p>
 
                           <p className="text-xs text-neutral-500">
-                            {isLocalPartner(group) ? "Local Partner · " : ""}
-                            {groupName}
+                            {group?.name ?? "East Lothian"}
                           </p>
                         </div>
                       </div>

@@ -225,24 +225,15 @@ export default async function HomePage() {
 
       {approvedPage && (
         <section className="mt-6 hidden grid-cols-3 gap-3 md:grid">
-          <Link
-            href={`/${approvedPage.slug}`}
-            className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white"
-          >
+          <Link href={`/${approvedPage.slug}`} className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white">
             My Page
           </Link>
 
-          <Link
-            href="/create-post"
-            className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white"
-          >
+          <Link href="/create-post" className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white">
             Create Post
           </Link>
 
-          <Link
-            href="/partner"
-            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black"
-          >
+          <Link href="/partner" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black">
             Become Local Partner
           </Link>
         </section>
@@ -264,6 +255,7 @@ export default async function HomePage() {
               timeLabel={getTimeLabel(post)}
               type={post.type}
               deal_price={post.deal_price}
+              isLocalPartner={isLocalPartner(post)}
             />
           ))}
         </>
@@ -283,6 +275,7 @@ export default async function HomePage() {
           timeLabel={getTimeLabel(post)}
           type={post.type}
           deal_price={post.deal_price}
+          isLocalPartner={isLocalPartner(post)}
         />
       ))}
 
@@ -329,6 +322,7 @@ export default async function HomePage() {
           timeLabel={getTimeLabel(post)}
           type={post.type}
           deal_price={post.deal_price}
+          isLocalPartner={isLocalPartner(post)}
         />
       ))}
 
@@ -346,9 +340,15 @@ export default async function HomePage() {
 
               <div>
                 <p className="text-sm font-semibold text-black">{post.title}</p>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {getPageName(post)}
-                </p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-xs text-neutral-500">{getPageName(post)}</p>
+
+                  {isLocalPartner(post) && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                      Local Partner
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
