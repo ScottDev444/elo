@@ -10,6 +10,10 @@ function getPageName(post: any) {
   return post.groups?.name ?? "East Lothian";
 }
 
+function isLocalPartner(post: any) {
+  return post.groups?.is_local_partner === true;
+}
+
 function normaliseDate(date: Date) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
@@ -116,6 +120,30 @@ function uniqueByTitle(posts: any[]) {
   });
 }
 
+function getThisWeekend(today: Date) {
+  const day = today.getDay();
+
+  const saturday = normaliseDate(new Date(today));
+  saturday.setDate(today.getDate() + ((6 - day + 7) % 7));
+
+  const sunday = normaliseDate(new Date(saturday));
+  sunday.setDate(saturday.getDate() + 1);
+
+  return { start: saturday, end: sunday };
+}
+
+function getNextWeek(today: Date) {
+  const day = today.getDay();
+
+  const monday = normaliseDate(new Date(today));
+  monday.setDate(today.getDate() + ((1 - day + 7) % 7 || 7));
+
+  const friday = normaliseDate(new Date(monday));
+  friday.setDate(monday.getDate() + 4);
+
+  return { start: monday, end: friday };
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
@@ -146,13 +174,14 @@ export default async function HomePage() {
       metadata,
       type,
       deal_price,
-      groups(name)
+      groups(name, is_local_partner)
     `)
     .order("created_at", { ascending: false })
     .limit(150);
 
   const allPosts = posts ?? [];
   const today = normaliseDate(new Date());
+  const day = today.getDay();
 
   const activeDatedPosts = allPosts.filter(
     (p: any) =>
@@ -161,29 +190,21 @@ export default async function HomePage() {
       !isExpired(p, today)
   );
 
-  const featuredPosts = uniqueByTitle(shuffle(activeDatedPosts)).slice(0, 3);
-
-  const day = today.getDay();
-
-  const saturday = normaliseDate(new Date(today));
-  saturday.setDate(today.getDate() + ((6 - day + 7) % 7));
-
-  const sunday = normaliseDate(new Date(saturday));
-  sunday.setDate(saturday.getDate() + 1);
-
-  const nextWeekEnd = normaliseDate(new Date(today));
-  nextWeekEnd.setDate(today.getDate() + 7);
+  const featuredPosts = uniqueByTitle(
+    shuffle(activeDatedPosts.filter((post: any) => isLocalPartner(post)))
+  ).slice(0, 3);
 
   const todayPosts = sortByNextSelectedDate(
     activeDatedPosts.filter((p: any) => hasSelectedDate(p, today)),
     today
   ).slice(0, 20);
 
+  const showNextWeek = day === 0 || day === 6;
+  const upcomingRange = showNextWeek ? getNextWeek(today) : getThisWeekend(today);
+
   const upcomingPosts = sortByNextSelectedDate(
     activeDatedPosts.filter((p: any) =>
-      day >= 4
-        ? hasSelectedDateBetween(p, saturday, sunday)
-        : hasSelectedDateBetween(p, today, nextWeekEnd)
+      hasSelectedDateBetween(p, upcomingRange.start, upcomingRange.end)
     ),
     today
   ).slice(0, 20);
@@ -192,45 +213,77 @@ export default async function HomePage() {
     allPosts.filter((p: any) => p.type === "update" && !isExpired(p, today))
   ).slice(0, 20);
 
-  const upcomingTitle =
-    day >= 4
-      ? "🎪 This Weekend in East Lothian"
-      : "📅 Next Week in East Lothian";
+  const upcomingTitle = showNextWeek
+    ? "📅 Next Week in East Lothian"
+    : "🎪 This Weekend in East Lothian";
 
   return (
-    <main className="min-h-screen bg-white p-6">
-      <HomeHero />
+    <main className="min-h-screen bg-white px-6 pb-6 pt-2 md:p-6">
+      <div className="-mx-6 md:mx-0 [&>*]:rounded-none md:[&>*]:rounded-[2rem]">
+        <HomeHero />
+      </div>
 
       {approvedPage && (
         <section className="mt-6 hidden grid-cols-3 gap-3 md:grid">
-          <Link href={`/${approvedPage.slug}`} className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white">
+          <Link
+            href={`/${approvedPage.slug}`}
+            className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white"
+          >
             My Page
           </Link>
 
-          <Link href="/create-post" className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white">
+          <Link
+            href="/create-post"
+            className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white"
+          >
             Create Post
           </Link>
 
-          <Link href="/partner" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black">
+          <Link
+            href="/partner"
+            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black"
+          >
             Become Local Partner
           </Link>
         </section>
       )}
 
-      <h2 className="mb-4 mt-10 text-3xl font-black tracking-tight text-black">
-        ✨ Featured
-      </h2>
+      {featuredPosts.length > 0 && (
+        <>
+          <h2 className="mb-4 mt-10 text-3xl font-black tracking-tight text-black">
+            ✨ Featured
+          </h2>
 
-      {featuredPosts.map((post: any) => (
-        <PostCard key={post.id} id={post.id} title={post.title} pageName={getPageName(post)} imageUrl={post.image_url} timeLabel={getTimeLabel(post)} type={post.type} deal_price={post.deal_price} />
-      ))}
+          {featuredPosts.map((post: any) => (
+            <PostCard
+              key={post.id}
+              id={post.id}
+              title={post.title}
+              pageName={getPageName(post)}
+              imageUrl={post.image_url}
+              timeLabel={getTimeLabel(post)}
+              type={post.type}
+              deal_price={post.deal_price}
+            />
+          ))}
+        </>
+      )}
 
       <h2 className="mb-4 mt-12 text-3xl font-black tracking-tight text-black">
         🌞 Today in East Lothian
       </h2>
 
       {todayPosts.map((post: any) => (
-        <PostCard key={post.id} id={post.id} title={post.title} pageName={getPageName(post)} imageUrl={post.image_url} timeLabel={getTimeLabel(post)} type={post.type} deal_price={post.deal_price} />
+        <PostCard
+          key={post.id}
+          id={post.id}
+          title={post.title}
+          pageName={getPageName(post)}
+          imageUrl={post.image_url}
+          timeLabel={getTimeLabel(post)}
+          type={post.type}
+          deal_price={post.deal_price}
+        />
       ))}
 
       <Link href="/calendar" className="block">
@@ -240,7 +293,11 @@ export default async function HomePage() {
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.25em] text-emerald-100/70">
                 East Lothian Calendar
               </p>
-              <h2 className="text-3xl font-black leading-none">Plan your week.</h2>
+
+              <h2 className="text-3xl font-black leading-none">
+                Plan your week.
+              </h2>
+
               <p className="mt-3 max-w-sm text-sm text-white/80">
                 Events, deals and local updates across East Lothian.
               </p>
@@ -263,7 +320,16 @@ export default async function HomePage() {
       </h2>
 
       {upcomingPosts.map((post: any) => (
-        <PostCard key={post.id} id={post.id} title={post.title} pageName={getPageName(post)} imageUrl={post.image_url} timeLabel={getTimeLabel(post)} type={post.type} deal_price={post.deal_price} />
+        <PostCard
+          key={post.id}
+          id={post.id}
+          title={post.title}
+          pageName={getPageName(post)}
+          imageUrl={post.image_url}
+          timeLabel={getTimeLabel(post)}
+          type={post.type}
+          deal_price={post.deal_price}
+        />
       ))}
 
       <h2 className="mb-4 mt-12 text-3xl font-black tracking-tight text-black">
@@ -280,7 +346,9 @@ export default async function HomePage() {
 
               <div>
                 <p className="text-sm font-semibold text-black">{post.title}</p>
-                <p className="mt-1 text-xs text-neutral-500">{getPageName(post)}</p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {getPageName(post)}
+                </p>
               </div>
             </div>
 

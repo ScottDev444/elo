@@ -19,9 +19,22 @@ type SearchPost = {
   id: string;
   title: string;
   type: string;
-  groups?: {
-    name?: string;
-  }[] | null;
+  groups?:
+    | {
+        name?: string;
+        slug?: string | null;
+        is_local_partner?: boolean | null;
+        local_partner?: boolean | null;
+        partner?: boolean | null;
+      }
+    | {
+        name?: string;
+        slug?: string | null;
+        is_local_partner?: boolean | null;
+        local_partner?: boolean | null;
+        partner?: boolean | null;
+      }[]
+    | null;
 };
 
 type SearchPage = {
@@ -29,7 +42,14 @@ type SearchPage = {
   name: string;
   slug: string;
   page_type?: string | null;
+  is_local_partner?: boolean | null;
+  local_partner?: boolean | null;
+  partner?: boolean | null;
 };
+
+type SearchResult =
+  | { kind: "page"; page: SearchPage }
+  | { kind: "post"; post: SearchPost };
 
 export default function QuickActionBar() {
   const [isMobile, setIsMobile] = useState(false);
@@ -51,6 +71,24 @@ export default function QuickActionBar() {
 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousPosition = document.body.style.position;
+    const previousWidth = document.body.style.width;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.position = previousPosition;
+      document.body.style.width = previousWidth;
+    };
+  }, [searchOpen]);
 
   useEffect(() => {
     async function checkApprovedPage() {
@@ -92,35 +130,31 @@ export default function QuickActionBar() {
       const [pageResult, postResult] = await Promise.all([
         supabase
           .from("groups")
-          .select("id, name, slug, page_type")
+          .select(
+            "id, name, slug, page_type, is_local_partner, local_partner, partner",
+          )
           .eq("status", "approved")
           .or(
-            `name.ilike.%${cleaned}%,description.ilike.%${cleaned}%,page_type.ilike.%${cleaned}%`
+            `name.ilike.%${cleaned}%,description.ilike.%${cleaned}%,page_type.ilike.%${cleaned}%`,
           )
           .limit(8),
 
         supabase
           .from("posts")
-          .select(`
+          .select(
+            `
             id,
             title,
             type,
-            groups(name)
-          `)
+            groups(name, slug, is_local_partner, local_partner, partner)
+          `,
+          )
           .or(`title.ilike.%${cleaned}%,type.ilike.%${cleaned}%`)
           .limit(12),
       ]);
 
-      const sortedPosts = ((postResult.data ?? []) as SearchPost[]).sort(
-        (a, b) => {
-          if (a.type === "update" && b.type !== "update") return -1;
-          if (a.type !== "update" && b.type === "update") return 1;
-          return 0;
-        }
-      );
-
       setPages((pageResult.data ?? []) as SearchPage[]);
-      setPosts(sortedPosts);
+      setPosts((postResult.data ?? []) as SearchPost[]);
       setLoading(false);
     }, 250);
 
@@ -154,9 +188,68 @@ export default function QuickActionBar() {
     { label: "Home", href: "/", icon: House },
   ];
 
-  const hasResults = useMemo(() => {
-    return pages.length > 0 || posts.length > 0;
+  function getPostGroup(post: SearchPost) {
+    return Array.isArray(post.groups) ? post.groups[0] : post.groups;
+  }
+
+  function isLocalPartner(
+    value?: {
+      is_local_partner?: boolean | null;
+      local_partner?: boolean | null;
+      partner?: boolean | null;
+    } | null,
+  ) {
+    return !!(
+      value?.is_local_partner ||
+      value?.local_partner ||
+      value?.partner
+    );
+  }
+
+  function isEastLothianOnlinePost(post: SearchPost) {
+    const group = getPostGroup(post);
+    return (
+      group?.slug === "east-lothian-online" ||
+      group?.name?.trim().toLowerCase() === "east lothian online"
+    );
+  }
+
+  function typeRank(result: SearchResult) {
+    if (result.kind === "page") return 3;
+
+    if (result.post.type === "update" || result.post.type === "alert") return 0;
+    if (result.post.type === "deal") return 1;
+    if (result.post.type === "event") return 2;
+
+    return 4;
+  }
+
+  const results = useMemo<SearchResult[]>(() => {
+    return [
+      ...pages.map((page) => ({ kind: "page" as const, page })),
+      ...posts.map((post) => ({ kind: "post" as const, post })),
+    ].sort((a, b) => {
+      const aIsEloPost = a.kind === "post" && isEastLothianOnlinePost(a.post);
+      const bIsEloPost = b.kind === "post" && isEastLothianOnlinePost(b.post);
+
+      if (aIsEloPost !== bIsEloPost) return aIsEloPost ? 1 : -1;
+
+      const aPartner =
+        a.kind === "page"
+          ? isLocalPartner(a.page)
+          : isLocalPartner(getPostGroup(a.post));
+      const bPartner =
+        b.kind === "page"
+          ? isLocalPartner(b.page)
+          : isLocalPartner(getPostGroup(b.post));
+
+      if (aPartner !== bPartner) return aPartner ? -1 : 1;
+
+      return typeRank(a) - typeRank(b);
+    });
   }, [pages, posts]);
+
+  const hasResults = results.length > 0;
 
   if (!isMobile) return null;
 
@@ -185,12 +278,12 @@ export default function QuickActionBar() {
             >
               <Icon size={22} className="text-black" />
             </Link>
-          )
+          ),
         )}
       </nav>
 
       {searchOpen && (
-        <div className="fixed inset-0 z-[100] bg-white">
+        <div className="fixed inset-0 z-[100] flex h-dvh flex-col overflow-hidden bg-white">
           <div className="flex items-center gap-3 border-b border-neutral-100 p-4">
             <div className="flex flex-1 items-center gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
               <Search size={20} className="text-neutral-400" />
@@ -216,7 +309,7 @@ export default function QuickActionBar() {
             </button>
           </div>
 
-          <div className="p-5 pb-24">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 pb-24">
             {query.trim().length < 2 ? (
               <div className="rounded-[2rem] bg-emerald-800 p-6 text-white">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-100/70">
@@ -236,96 +329,80 @@ export default function QuickActionBar() {
                 Searching...
               </p>
             ) : hasResults ? (
-              <div className="space-y-8">
-                {pages.length > 0 && (
-                  <section>
-                    <h2 className="mb-3 text-2xl font-black text-black">
-                      🏪 Pages
-                    </h2>
+              <div className="space-y-2">
+                {results.map((result) => {
+                  if (result.kind === "page") {
+                    const page = result.page;
 
-                    <div className="space-y-2">
-                      {pages.map((page) => (
-                        <Link
-                          key={page.id}
-                          href={`/${page.slug}`}
-                          onClick={() => setSearchOpen(false)}
-                          className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-800">
-                              <Store size={20} />
-                            </div>
-
-                            <div>
-                              <p className="font-bold text-black">
-                                {page.name}
-                              </p>
-
-                              <p className="text-xs text-neutral-500">
-                                {page.page_type ?? "Page"}
-                              </p>
-                            </div>
+                    return (
+                      <Link
+                        key={`page-${page.id}`}
+                        href={`/${page.slug}`}
+                        onClick={() => setSearchOpen(false)}
+                        className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-800">
+                            <Store size={20} />
                           </div>
 
-                          <ChevronRight
-                            size={20}
-                            className="text-neutral-400"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                          <div>
+                            <p className="font-bold text-black">{page.name}</p>
 
-                {posts.length > 0 && (
-                  <section>
-                    <h2 className="mb-3 text-2xl font-black text-black">
-                      ⚠️ Alerts, events & deals
-                    </h2>
-
-                    <div className="space-y-2">
-                      {posts.map((post) => (
-                        <Link
-                          key={post.id}
-                          href={`/posts/${post.id}`}
-                          onClick={() => setSearchOpen(false)}
-                          className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`rounded-2xl p-3 ${
-                                post.type === "update"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-emerald-100 text-emerald-800"
-                              }`}
-                            >
-                              {post.type === "update" ? (
-                                <AlertTriangle size={20} />
-                              ) : (
-                                <CalendarDays size={20} />
-                              )}
-                            </div>
-
-                            <div>
-                              <p className="font-bold text-black">
-                                {post.title}
-                              </p>
-
-                              <p className="text-xs text-neutral-500">
-                                {post.groups?.[0]?.name ?? "East Lothian"}
-                              </p>
-                            </div>
+                            <p className="text-xs text-neutral-500">
+                              {isLocalPartner(page) ? "Local Partner · " : ""}
+                              {page.page_type ?? "Page"}
+                            </p>
                           </div>
+                        </div>
 
-                          <ChevronRight
-                            size={20}
-                            className="text-neutral-400"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                        <ChevronRight size={20} className="text-neutral-400" />
+                      </Link>
+                    );
+                  }
+
+                  const post = result.post;
+                  const isAlert =
+                    post.type === "update" || post.type === "alert";
+                  const group = getPostGroup(post);
+                  const groupName = group?.name ?? "East Lothian";
+
+                  return (
+                    <Link
+                      key={`post-${post.id}`}
+                      href={`/posts/${post.id}`}
+                      onClick={() => setSearchOpen(false)}
+                      className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`rounded-2xl p-3 ${
+                            isAlert
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {isAlert ? (
+                            <AlertTriangle size={20} />
+                          ) : (
+                            <CalendarDays size={20} />
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="font-bold text-black">{post.title}</p>
+
+                          <p className="text-xs text-neutral-500">
+                            {isLocalPartner(group) ? "Local Partner · " : ""}
+                            {groupName}
+                          </p>
+                        </div>
+                      </div>
+
+                      <ChevronRight size={20} className="text-neutral-400" />
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-[2rem] bg-neutral-100 p-6 text-center">

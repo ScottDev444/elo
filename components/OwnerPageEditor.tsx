@@ -505,6 +505,7 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
+  const [showPartnerPopup, setShowPartnerPopup] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -782,7 +783,9 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
       if (error) throw new Error(error.message);
       if (!data) throw new Error("No page was submitted. Check this account owns the page.");
 
-      window.location.href = "/partner?submitted=true";
+      setMessage("Submitted for review.");
+      setShowPartnerPopup(true);
+      setIsSubmitting(false);
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");
       setMessage("");
@@ -825,6 +828,48 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+      {showPartnerPopup ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 text-center shadow-2xl">
+            <h2 className="text-2xl font-black tracking-tight text-gray-950">
+              Become a Local Partner 💚
+            </h2>
+
+            <div className="mt-6 space-y-3 text-left">
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-black text-gray-900">
+                Boosted Visibility 🚀
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-black text-gray-900">
+                Local Insights 📈
+              </div>
+              <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-black text-gray-900">
+                Support Local 🌳
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/partner";
+                }}
+                className="rounded-full px-5 py-3 text-sm font-black text-white"
+                style={{ backgroundColor: brandColor }}
+              >
+                Let’s do this 🤝
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPartnerPopup(false)}
+                className="rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-black text-gray-700"
+              >
+                No thanks 👋
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-5 flex flex-col gap-4 rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-gray-400">
@@ -834,7 +879,7 @@ export default function OwnerPageEditor({ initialGroup, initialPosts }: Props) {
             {typeCopy.title}
           </h1>
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Make it clear, local, and good enough to launch. No faff.
+            Design your page with our easy-to-use builder.
           </p>
         </div>
 

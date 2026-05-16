@@ -50,6 +50,7 @@ export default function CreatePostPage() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [monthDate, setMonthDate] = useState(() => normaliseDate(new Date()));
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const [dealKind, setDealKind] = useState<DealKind>("price");
   const [dealPrice, setDealPrice] = useState("");
@@ -59,6 +60,18 @@ export default function CreatePostPage() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview("");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreview(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [imageFile]);
 
   useEffect(() => {
     async function loadPages() {
@@ -94,10 +107,19 @@ export default function CreatePostPage() {
         return;
       }
 
-      setPages(data ?? []);
+      const loadedPages = data ?? [];
+      setPages(loadedPages);
 
-      if (data?.[0]?.id) {
-        setGroupId(data[0].id);
+      if (loadedPages.length > 0) {
+        const eloPage = loadedPages.find(
+          (page) => page.name.toLowerCase() === "east lothian online"
+        );
+
+        if (profile?.role === "admin" && eloPage) {
+          setGroupId(eloPage.id);
+        } else {
+          setGroupId(loadedPages[0].id);
+        }
       }
     }
 
@@ -512,7 +534,7 @@ export default function CreatePostPage() {
                 Image
               </label>
 
-              <label className="flex aspect-square cursor-pointer items-center justify-center rounded-[2rem] bg-white text-neutral-400">
+              <label className="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-[2rem] bg-white text-neutral-400">
                 <input
                   type="file"
                   accept="image/*"
@@ -520,10 +542,18 @@ export default function CreatePostPage() {
                   className="hidden"
                 />
 
-                {imageFile ? (
-                  <span className="text-sm font-bold text-black">
-                    {imageFile.name}
-                  </span>
+                {imagePreview ? (
+                  <>
+                    <img
+                      src={imagePreview}
+                      alt="Post preview"
+                      className="h-full w-full object-cover"
+                    />
+
+                    <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/60 px-4 py-3 text-center text-sm font-black text-white backdrop-blur">
+                      Tap to change image
+                    </div>
+                  </>
                 ) : (
                   <div className="text-center">
                     <ImagePlus className="mx-auto mb-2" size={32} />
@@ -531,6 +561,16 @@ export default function CreatePostPage() {
                   </div>
                 )}
               </label>
+
+              {imageFile && (
+                <button
+                  type="button"
+                  onClick={() => setImageFile(null)}
+                  className="mt-3 rounded-full bg-red-50 px-4 py-2 text-sm font-bold text-red-700"
+                >
+                  Remove image
+                </button>
+              )}
             </section>
           </>
         )}

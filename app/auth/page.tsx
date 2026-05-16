@@ -3,24 +3,7 @@ import SignInBox from "./SignInBox";
 export default function AuthPage() {
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-white px-5 text-zinc-950">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden select-none">
-        {[
-          "🔑","🔒","🗝️","🔐","🔑","🗝️","🔒","🔑",
-          "🔐","🗝️","🔑","🔒","🗝️","🔐","🔑","🗝️",
-          "🔒","🔑","🔐","🗝️","🔑","🔒","🗝️","🔑",
-        ].map((emoji, i) => (
-          <span
-            key={i}
-            className="absolute text-[20px]"
-            style={{
-              left: `${(i * 13) % 100}%`,
-              top: `${(i * 17) % 100}%`,
-            }}
-          >
-            {emoji}
-          </span>
-        ))}
-      </div>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_45%)]" />
 
       <section className="relative z-10 mx-auto flex w-full max-w-[360px] flex-col pt-16">
         <div className="mb-6">
