@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 import Header from "@/components/Header";
@@ -40,6 +41,8 @@ export default function RootLayout({
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-neutral-200 bg-white p-4 md:hidden">
           <QuickActionBar />
         </div>
+
+        <Analytics />
       </body>
     </html>
   );
