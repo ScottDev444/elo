@@ -19,6 +19,13 @@ type OpeningDay = {
   is_24_7?: boolean;
 };
 
+type PlaceGroup = {
+  name?: string;
+  slug?: string;
+  is_local_partner?: boolean;
+  brand_color?: string;
+};
+
 type Place = {
   id: string;
   slug?: string;
@@ -27,24 +34,13 @@ type Place = {
   location_name?: string;
   address?: string;
   postcode?: string;
-  brand_color?: string;
   tags?: string[];
   images?: string[];
   opening_hours?: Record<string, OpeningDay>;
   metadata?: {
     open_24_7?: boolean;
   };
-  groups?:
-    | {
-        name?: string;
-        slug?: string;
-        is_local_partner?: boolean;
-      }
-    | {
-        name?: string;
-        slug?: string;
-        is_local_partner?: boolean;
-      }[];
+  groups?: PlaceGroup | PlaceGroup[];
 };
 
 const dayLabels = [
@@ -61,30 +57,25 @@ function isSafeHexColour(value?: string) {
   return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
 }
 
-function isLocalPartner(place: Place) {
+function groupData(place: Place) {
   if (Array.isArray(place.groups)) {
-    return place.groups.some(
-      (group) => group.is_local_partner === true
-    );
+    return place.groups[0];
   }
 
-  return place.groups?.is_local_partner === true;
+  return place.groups;
+}
+
+function isLocalPartner(place: Place) {
+  const group = groupData(place);
+  return group?.is_local_partner === true;
 }
 
 function pageName(place: Place) {
-  if (Array.isArray(place.groups)) {
-    return place.groups[0]?.name ?? "East Lothian Online";
-  }
-
-  return place.groups?.name ?? "East Lothian Online";
+  return groupData(place)?.name ?? "East Lothian Online";
 }
 
 function pageSlug(place: Place) {
-  if (Array.isArray(place.groups)) {
-    return place.groups[0]?.slug ?? "";
-  }
-
-  return place.groups?.slug ?? "";
+  return groupData(place)?.slug ?? "";
 }
 
 function getTodayKey() {
@@ -148,12 +139,11 @@ export default async function PlacePage({
       location_name,
       address,
       postcode,
-      brand_color,
       tags,
       images,
       opening_hours,
       metadata,
-      groups(name, slug, is_local_partner)
+      groups(name, slug, is_local_partner, brand_color)
     `)
     .eq("slug", slug)
     .eq("is_active", true)
@@ -163,9 +153,10 @@ export default async function PlacePage({
 
   const open = isPlaceOpen(place);
   const ownerSlug = pageSlug(place);
+  const group = groupData(place);
 
-  const brandColour = isSafeHexColour(place.brand_color)
-    ? place.brand_color
+  const brandColour = isSafeHexColour(group?.brand_color)
+    ? group?.brand_color
     : "#047857";
 
   return (
@@ -183,9 +174,7 @@ export default async function PlacePage({
             <div className="mb-3 flex flex-wrap gap-2">
               <span
                 className={`rounded-full px-3 py-1 text-xs font-black ${
-                  open
-                    ? "bg-white text-black"
-                    : "bg-white/20 text-white"
+                  open ? "bg-white text-black" : "bg-white/20 text-white"
                 }`}
               >
                 {todayLabel(place)}
