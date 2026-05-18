@@ -33,6 +33,7 @@ type OpeningDay = {
 
 type PlacePayload = {
   page_id: string;
+  slug: string;
   title: string;
   description: string;
   location_name: string;
@@ -81,6 +82,15 @@ function monthLabel(date: Date) {
     month: "long",
     year: "numeric",
   });
+}
+
+function makeSlug(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export default function CreatePostPage() {
@@ -415,6 +425,35 @@ export default function CreatePostPage() {
     });
   }
 
+  async function getAvailablePlaceSlug(title: string) {
+    const baseSlug = makeSlug(title) || `place-${crypto.randomUUID().slice(0, 8)}`;
+
+    const { data, error } = await supabase
+      .from("places")
+      .select("id, slug")
+      .ilike("slug", `${baseSlug}%`);
+
+    if (error) throw new Error(error.message);
+
+    const existingSlugs = (data ?? [])
+      .filter((place) => place.id !== existingPlaceId)
+      .map((place) => place.slug);
+
+    if (!existingSlugs.includes(baseSlug)) {
+      return baseSlug;
+    }
+
+    let counter = 2;
+    let nextSlug = `${baseSlug}-${counter}`;
+
+    while (existingSlugs.includes(nextSlug)) {
+      counter += 1;
+      nextSlug = `${baseSlug}-${counter}`;
+    }
+
+    return nextSlug;
+  }
+
   async function handlePlaceSubmit() {
     setMessage("");
 
@@ -437,9 +476,11 @@ export default function CreatePostPage() {
       setPlaceLoading(true);
 
       const images = await uploadPlaceImages();
+      const slug = await getAvailablePlaceSlug(placeTitle);
 
       const payload: PlacePayload = {
         page_id: groupId,
+        slug,
         title: placeTitle.trim(),
         description: placeDescription.trim(),
         location_name: placeLocation.trim(),

@@ -133,7 +133,6 @@ function getThisWeekend(today: Date) {
   return { start: saturday, end: sunday };
 }
 
-
 function getCurrentTimeKey() {
   return new Date().toTimeString().slice(0, 5);
 }
@@ -228,7 +227,6 @@ export default async function HomePage() {
     .order("created_at", { ascending: false })
     .limit(150);
 
-
   const { data: places } = await supabase
     .from("places")
     .select(`
@@ -287,7 +285,6 @@ export default async function HomePage() {
     (places ?? []).filter((place: any) => isPlaceOpenNow(place))
   ).slice(0, 10);
 
-
   const upcomingTitle = showNextWeek
     ? "Next Week in East Lothian 📅"
     : "This Weekend in East Lothian 🍦";
@@ -300,15 +297,24 @@ export default async function HomePage() {
 
       {approvedPage && (
         <section className="mt-6 hidden grid-cols-3 gap-3 md:grid">
-          <Link href={`/${approvedPage.slug}`} className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white">
+          <Link
+            href={`/${approvedPage.slug}`}
+            className="rounded-2xl bg-black px-5 py-4 text-center text-sm font-black text-white"
+          >
             My Page
           </Link>
 
-          <Link href="/create-post" className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white">
+          <Link
+            href="/create-post"
+            className="rounded-2xl bg-emerald-700 px-5 py-4 text-center text-sm font-black text-white"
+          >
             Create Post
           </Link>
 
-          <Link href="/partner" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black">
+          <Link
+            href="/partner"
+            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-center text-sm font-black text-black"
+          >
             Become Local Partner
           </Link>
         </section>
@@ -354,21 +360,12 @@ export default async function HomePage() {
         />
       ))}
 
-
-
       {openPlaces.length > 0 && (
         <>
-          <div className="mb-4 mt-12 flex items-center justify-between gap-4">
+          <div className="mb-4 mt-12">
             <h2 className="text-3xl font-black tracking-tight text-black">
-              Places
+              Open now 🟢
             </h2>
-
-            <Link
-              href="/explore"
-              className="rounded-full bg-black px-4 py-2 text-sm font-black text-white"
-            >
-              Explore East Lothian
-            </Link>
           </div>
 
           <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-3 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3">
@@ -381,11 +378,19 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
+
+          <Link
+            href="/explore"
+            className="mt-4 flex items-center justify-center gap-1 text-sm font-black text-black underline underline-offset-4"
+          >
+            View all
+            <ChevronRight size={16} />
+          </Link>
         </>
       )}
 
-      <Link href="/calendar" className="block">
-        <section className="mt-12 overflow-hidden rounded-[2rem] bg-emerald-800 p-6 text-white shadow-xl">
+      <Link href="/calendar" className="-mx-6 mt-12 block md:mx-0">
+        <section className="bg-emerald-800 p-6 text-white shadow-xl md:rounded-[2rem]">
           <div className="flex items-center justify-between gap-5">
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.25em] text-emerald-100/70">
@@ -406,7 +411,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-between rounded-2xl bg-emerald-900/30 px-4 py-3">
+          <div className="mt-6 flex items-center justify-between bg-emerald-900/30 px-4 py-3">
             <span className="text-sm font-semibold">Open calendar</span>
             <ChevronRight size={20} />
           </div>
@@ -435,32 +440,39 @@ export default async function HomePage() {
         ⚠️ Local Alerts
       </h2>
 
-      {alertPosts.map((post: any) => (
-        <Link key={post.id} href={`/posts/${post.id}`}>
-          <article className="flex items-center justify-between border-b border-neutral-100 py-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-yellow-100 p-3">
-                <AlertTriangle size={22} className="text-yellow-700" />
-              </div>
+      {alertPosts.length > 0 ? (
+        alertPosts.map((post: any) => (
+          <Link key={post.id} href={`/posts/${post.id}`}>
+            <article className="flex items-center justify-between border-b border-neutral-100 py-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-yellow-100 p-3">
+                  <AlertTriangle size={22} className="text-yellow-700" />
+                </div>
 
-              <div>
-                <p className="text-sm font-semibold text-black">{post.title}</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <p className="text-xs text-neutral-500">{getPageName(post)}</p>
+                <div>
+                  <p className="text-sm font-semibold text-black">{post.title}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="text-xs text-neutral-500">{getPageName(post)}</p>
 
-                  {isLocalPartner(post) && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                      Local Partner
-                    </span>
-                  )}
+                    {isLocalPartner(post) && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                        Local Partner
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <ChevronRight size={22} className="text-neutral-400" />
-          </article>
-        </Link>
-      ))}
+              <ChevronRight size={22} className="text-neutral-400" />
+            </article>
+          </Link>
+        ))
+      ) : (
+        <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-5 text-center">
+          <p className="text-sm font-black text-black">No alerts today 🎉</p>
+          <p className="mt-1 text-xs text-neutral-500">All quiet across East Lothian.</p>
+        </div>
+      )}
     </main>
   );
 }
