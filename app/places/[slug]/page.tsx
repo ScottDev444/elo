@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   Clock3,
   MapPin,
   Tag,
-  ImageIcon,
 } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
+import BackButton from "@/components/BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -160,76 +160,50 @@ export default async function PlacePage({
 
   return (
     <main className="min-h-screen bg-white px-6 pb-12 pt-4 md:p-8">
-      <Link
-        href="/explore"
-        className="mb-5 inline-flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2 text-sm font-black text-black"
-      >
-        <ArrowLeft size={16} />
-        Back to Explore
-      </Link>
+      <div className="mb-5">
+        <BackButton />
+      </div>
 
-      <section className="overflow-hidden rounded-[2rem] bg-black text-white shadow-xl">
-        {place.images?.[0] ? (
-          <div className="relative aspect-[16/10] w-full overflow-hidden md:aspect-[21/9]">
-            <img
-              src={place.images[0]}
-              alt={place.title}
-              className="h-full w-full object-cover"
-            />
+      <section className="rounded-[2rem] bg-emerald-700 p-6 text-white shadow-xl">
+        <div className="flex flex-col items-start gap-6 md:flex-row">
+          <div className="flex-1">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${
+                  open
+                    ? "bg-white text-emerald-800"
+                    : "bg-white/20 text-white"
+                }`}
+              >
+                {todayLabel(place)}
+              </span>
 
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
-              <div className="mb-3 flex flex-wrap gap-2">
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-black ${
-                    open
-                      ? "bg-emerald-400 text-emerald-950"
-                      : "bg-white/20 text-white"
-                  }`}
-                >
-                  {todayLabel(place)}
+              {isLocalPartner(place) && (
+                <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-black text-white">
+                  Local Partner
                 </span>
-
-                {isLocalPartner(place) && (
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800">
-                    Local Partner
-                  </span>
-                )}
-              </div>
-
-              <h1 className="max-w-3xl text-5xl font-black leading-none tracking-tight md:text-7xl">
-                {place.title}
-              </h1>
-
-              {place.location_name && (
-                <div className="mt-4 flex items-center gap-2 text-sm font-bold text-white/85">
-                  <MapPin size={18} />
-                  {place.location_name}
-                </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="p-6 md:p-10">
-            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[1.5rem] bg-white/10">
-              <ImageIcon size={32} />
-            </div>
 
-            <h1 className="max-w-3xl text-5xl font-black leading-none tracking-tight md:text-7xl">
+            <h1 className="text-4xl font-black leading-none tracking-tight md:text-6xl">
               {place.title}
             </h1>
 
-            <p className="mt-4 text-sm font-bold text-white/70">
-              {todayLabel(place)}
-            </p>
+            {place.location_name && (
+              <div className="mt-4 flex items-center gap-2 text-sm font-bold text-white/90">
+                <MapPin size={18} />
+                {place.location_name}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </section>
 
       <section className="mt-6 grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
         <div className="rounded-[2rem] bg-neutral-50 p-6">
-          <h2 className="text-2xl font-black text-black">About</h2>
+          <h2 className="text-2xl font-black text-black">
+            About
+          </h2>
 
           <p className="mt-4 whitespace-pre-wrap text-base font-semibold leading-relaxed text-neutral-700">
             {place.description || "No description yet."}
@@ -261,32 +235,32 @@ export default async function PlacePage({
               {todayLabel(place)}
             </p>
 
-            <div className="mt-4 space-y-2">
-              {dayLabels.map(([key, label]) => {
-                const day = place.opening_hours?.[key];
+            {!place.metadata?.open_24_7 && (
+              <div className="mt-4 space-y-2">
+                {dayLabels.map(([key, label]) => {
+                  const day = place.opening_hours?.[key];
 
-                return (
-                  <div
-                    key={key}
-                    className="flex justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
-                  >
-                    <span className="font-bold text-black">
-                      {label}
-                    </span>
+                  return (
+                    <div
+                      key={key}
+                      className="flex justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
+                    >
+                      <span className="font-bold text-black">
+                        {label}
+                      </span>
 
-                    <span className="text-right font-semibold text-neutral-600">
-                      {place.metadata?.open_24_7
-                        ? "24 hours"
-                        : !day || day.closed
-                        ? "Closed"
-                        : day.is24h || day.is_24_7
-                        ? "24 hours"
-                        : `${day.open} - ${day.close}`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      <span className="text-right font-semibold text-neutral-600">
+                        {!day || day.closed
+                          ? "Closed"
+                          : day.is24h || day.is_24_7
+                          ? "24 hours"
+                          : `${day.open} - ${day.close}`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {(place.address ||
@@ -327,23 +301,27 @@ export default async function PlacePage({
         </aside>
       </section>
 
-      {(place.images?.length ?? 0) > 1 && (
+      {(place.images?.length ?? 0) > 0 && (
         <section className="mt-6">
           <h2 className="mb-4 text-3xl font-black text-black">
             Photos
           </h2>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {place.images
-              ?.slice(1)
-              .map((image: string, index: number) => (
-                <img
+          <div className="grid gap-4 md:grid-cols-3">
+            {place.images?.map(
+              (image: string, index: number) => (
+                <div
                   key={image}
-                  src={image}
-                  alt={`${place.title} photo ${index + 2}`}
-                  className="aspect-[16/10] w-full rounded-[2rem] object-cover"
-                />
-              ))}
+                  className="overflow-hidden rounded-[2rem] bg-neutral-100"
+                >
+                  <img
+                    src={image}
+                    alt={`${place.title} photo ${index + 1}`}
+                    className="h-72 w-full object-cover"
+                  />
+                </div>
+              )
+            )}
           </div>
         </section>
       )}

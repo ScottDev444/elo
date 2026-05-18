@@ -65,7 +65,7 @@ export default function PostCardPlace({ place }: Props) {
   const card = (
     <article className="h-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       {place.images?.[0] && (
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <div className="relative aspect-square w-full overflow-hidden">
           <img
             src={place.images[0]}
             alt={place.title}
@@ -75,7 +75,9 @@ export default function PostCardPlace({ place }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
           <div className="absolute bottom-4 left-4 right-4">
-            <h2 className="text-2xl font-black text-white">{place.title}</h2>
+            <h2 className="text-2xl font-black text-white">
+              {place.title}
+            </h2>
 
             {place.location_name && (
               <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-white/90">
@@ -90,7 +92,9 @@ export default function PostCardPlace({ place }: Props) {
       <div className="p-5">
         {!place.images?.[0] && (
           <>
-            <h2 className="text-2xl font-black text-black">{place.title}</h2>
+            <h2 className="text-2xl font-black text-black">
+              {place.title}
+            </h2>
 
             {place.location_name && (
               <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-neutral-500">
@@ -99,12 +103,6 @@ export default function PostCardPlace({ place }: Props) {
               </div>
             )}
           </>
-        )}
-
-        {place.description && (
-          <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-neutral-700">
-            {place.description}
-          </p>
         )}
 
         <div className="mt-5 rounded-2xl bg-emerald-50 p-4">
@@ -135,7 +133,9 @@ export default function PostCardPlace({ place }: Props) {
             </p>
 
             <p className="mt-2 text-sm font-semibold text-black">
-              {[place.address, place.postcode].filter(Boolean).join(", ")}
+              {[place.address, place.postcode]
+                .filter(Boolean)
+                .join(", ")}
             </p>
           </div>
         )}
