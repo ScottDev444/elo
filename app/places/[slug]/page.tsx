@@ -15,8 +15,15 @@ type OpeningDay = {
   is_24_7?: boolean;
 };
 
+type OwnerPage = {
+  name?: string;
+  slug?: string;
+  is_local_partner?: boolean;
+};
+
 type Place = {
   id: string;
+  page_id?: string;
   slug?: string;
   title: string;
   description?: string;
@@ -30,17 +37,6 @@ type Place = {
   metadata?: {
     open_24_7?: boolean;
   };
-  groups?:
-    | {
-        name?: string;
-        slug?: string;
-        is_local_partner?: boolean;
-      }
-    | {
-        name?: string;
-        slug?: string;
-        is_local_partner?: boolean;
-      }[];
 };
 
 const dayLabels = [
@@ -55,30 +51,6 @@ const dayLabels = [
 
 function isSafeHexColour(value?: string) {
   return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
-}
-
-function isLocalPartner(place: Place) {
-  if (Array.isArray(place.groups)) {
-    return place.groups.some((group) => group.is_local_partner === true);
-  }
-
-  return place.groups?.is_local_partner === true;
-}
-
-function pageName(place: Place) {
-  if (Array.isArray(place.groups)) {
-    return place.groups[0]?.name ?? "East Lothian Online";
-  }
-
-  return place.groups?.name ?? "East Lothian Online";
-}
-
-function pageSlug(place: Place) {
-  if (Array.isArray(place.groups)) {
-    return place.groups[0]?.slug ?? "";
-  }
-
-  return place.groups?.slug ?? "";
 }
 
 function getTodayKey() {
@@ -130,10 +102,11 @@ export default async function PlacePage({
 
   const supabase = await createClient();
 
-  const { data: place } = await supabase
+  const { data: place, error: placeError } = await supabase
     .from("places")
     .select(`
       id,
+      page_id,
       slug,
       title,
       description,
@@ -145,16 +118,31 @@ export default async function PlacePage({
       images,
       opening_hours,
       metadata,
-      groups(name, slug, is_local_partner)
+      is_active
     `)
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
 
-  if (!place) notFound();
+  if (placeError || !place) notFound();
+
+  let ownerPage: OwnerPage | null = null;
+
+  if (place.page_id) {
+    const { data: owner } = await supabase
+      .from("groups")
+      .select("name, slug, is_local_partner")
+      .eq("id", place.page_id)
+      .maybeSingle();
+
+    ownerPage = owner;
+  }
 
   const open = isPlaceOpen(place);
-  const ownerSlug = pageSlug(place);
+  const ownerSlug = ownerPage?.slug ?? "";
+  const ownerName = ownerPage?.name ?? "East Lothian Online";
+  const isLocalPartner = ownerPage?.is_local_partner === true;
+
   const brandColour = isSafeHexColour(place.brand_color)
     ? place.brand_color
     : "#047857";
@@ -180,7 +168,7 @@ export default async function PlacePage({
                 {todayLabel(place)}
               </span>
 
-              {isLocalPartner(place) && (
+              {isLocalPartner && (
                 <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-black text-white">
                   Local Partner
                 </span>
@@ -296,12 +284,10 @@ export default async function PlacePage({
                 className="mt-2 block text-lg font-black text-black underline underline-offset-4"
                 style={{ textDecorationColor: brandColour }}
               >
-                {pageName(place)}
+                {ownerName}
               </Link>
             ) : (
-              <p className="mt-2 text-lg font-black text-black">
-                {pageName(place)}
-              </p>
+              <p className="mt-2 text-lg font-black text-black">{ownerName}</p>
             )}
           </section>
         </aside>
