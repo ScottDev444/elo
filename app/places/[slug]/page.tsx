@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock3, MapPin, Tag } from "lucide-react";
+import {
+  Clock3,
+  MapPin,
+  Tag,
+} from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import BackButton from "@/components/BackButton";
@@ -15,28 +19,31 @@ type OpeningDay = {
   is_24_7?: boolean;
 };
 
-type OwnerPage = {
-  name?: string;
-  slug?: string;
-  is_local_partner?: boolean;
-};
-
 type Place = {
   id: string;
-  page_id?: string;
   slug?: string;
   title: string;
   description?: string;
   location_name?: string;
   address?: string;
   postcode?: string;
-  brand_color?: string;
   tags?: string[];
   images?: string[];
   opening_hours?: Record<string, OpeningDay>;
   metadata?: {
     open_24_7?: boolean;
   };
+  groups?:
+    | {
+        name?: string;
+        slug?: string;
+        is_local_partner?: boolean;
+      }
+    | {
+        name?: string;
+        slug?: string;
+        is_local_partner?: boolean;
+      }[];
 };
 
 const dayLabels = [
@@ -49,8 +56,30 @@ const dayLabels = [
   ["sunday", "Sunday"],
 ] as const;
 
-function isSafeHexColour(value?: string) {
-  return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
+function isLocalPartner(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups.some(
+      (group) => group.is_local_partner === true
+    );
+  }
+
+  return place.groups?.is_local_partner === true;
+}
+
+function pageName(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups[0]?.name ?? "East Lothian Online";
+  }
+
+  return place.groups?.name ?? "East Lothian Online";
+}
+
+function pageSlug(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups[0]?.slug ?? "";
+  }
+
+  return place.groups?.slug ?? "";
 }
 
 function getTodayKey() {
@@ -88,7 +117,9 @@ function todayLabel(place: Place) {
 
   if (!todayHours) return "Hours unavailable";
   if (todayHours.closed) return "Closed today";
-  if (todayHours.is24h || todayHours.is_24_7) return "Open 24/7";
+  if (todayHours.is24h || todayHours.is_24_7) {
+    return "Open 24/7";
+  }
 
   return `Open today ${todayHours.open} - ${todayHours.close}`;
 }
@@ -102,50 +133,30 @@ export default async function PlacePage({
 
   const supabase = await createClient();
 
-  const { data: place, error: placeError } = await supabase
+  const { data: place } = await supabase
     .from("places")
     .select(`
       id,
-      page_id,
       slug,
       title,
       description,
       location_name,
       address,
       postcode,
-      brand_color,
       tags,
       images,
       opening_hours,
       metadata,
-      is_active
+      groups(name, slug, is_local_partner)
     `)
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
 
-  if (placeError || !place) notFound();
-
-  let ownerPage: OwnerPage | null = null;
-
-  if (place.page_id) {
-    const { data: owner } = await supabase
-      .from("groups")
-      .select("name, slug, is_local_partner")
-      .eq("id", place.page_id)
-      .maybeSingle();
-
-    ownerPage = owner;
-  }
+  if (!place) notFound();
 
   const open = isPlaceOpen(place);
-  const ownerSlug = ownerPage?.slug ?? "";
-  const ownerName = ownerPage?.name ?? "East Lothian Online";
-  const isLocalPartner = ownerPage?.is_local_partner === true;
-
-  const brandColour = isSafeHexColour(place.brand_color)
-    ? place.brand_color
-    : "#047857";
+  const ownerSlug = pageSlug(place);
 
   return (
     <main className="min-h-screen bg-white px-6 pb-12 pt-4 md:p-8">
@@ -153,22 +164,21 @@ export default async function PlacePage({
         <BackButton />
       </div>
 
-      <section
-        className="rounded-[2rem] p-6 text-white shadow-xl"
-        style={{ backgroundColor: brandColour }}
-      >
+      <section className="rounded-[2rem] bg-emerald-700 p-6 text-white shadow-xl">
         <div className="flex flex-col items-start gap-6 md:flex-row">
           <div className="flex-1">
             <div className="mb-3 flex flex-wrap gap-2">
               <span
                 className={`rounded-full px-3 py-1 text-xs font-black ${
-                  open ? "bg-white text-black" : "bg-white/20 text-white"
+                  open
+                    ? "bg-white text-emerald-800"
+                    : "bg-white/20 text-white"
                 }`}
               >
                 {todayLabel(place)}
               </span>
 
-              {isLocalPartner && (
+              {isLocalPartner(place) && (
                 <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-black text-white">
                   Local Partner
                 </span>
@@ -191,7 +201,9 @@ export default async function PlacePage({
 
       <section className="mt-6 grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
         <div className="rounded-[2rem] bg-neutral-50 p-6">
-          <h2 className="text-2xl font-black text-black">About</h2>
+          <h2 className="text-2xl font-black text-black">
+            About
+          </h2>
 
           <p className="mt-4 whitespace-pre-wrap text-base font-semibold leading-relaxed text-neutral-700">
             {place.description || "No description yet."}
@@ -213,22 +225,13 @@ export default async function PlacePage({
         </div>
 
         <aside className="space-y-4">
-          <section
-            className="rounded-[2rem] p-5"
-            style={{ backgroundColor: `${brandColour}14` }}
-          >
-            <div
-              className="flex items-center gap-2"
-              style={{ color: brandColour }}
-            >
+          <section className="rounded-[2rem] bg-emerald-50 p-5">
+            <div className="flex items-center gap-2 text-emerald-900">
               <Clock3 size={20} />
               <h2 className="font-black">Opening hours</h2>
             </div>
 
-            <p
-              className="mt-3 text-sm font-black"
-              style={{ color: brandColour }}
-            >
+            <p className="mt-3 text-sm font-black text-emerald-900">
               {todayLabel(place)}
             </p>
 
@@ -242,14 +245,16 @@ export default async function PlacePage({
                       key={key}
                       className="flex justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
                     >
-                      <span className="font-bold text-black">{label}</span>
+                      <span className="font-bold text-black">
+                        {label}
+                      </span>
 
                       <span className="text-right font-semibold text-neutral-600">
                         {!day || day.closed
                           ? "Closed"
                           : day.is24h || day.is_24_7
-                            ? "24 hours"
-                            : `${day.open} - ${day.close}`}
+                          ? "24 hours"
+                          : `${day.open} - ${day.close}`}
                       </span>
                     </div>
                   );
@@ -258,7 +263,9 @@ export default async function PlacePage({
             )}
           </section>
 
-          {(place.address || place.postcode || place.location_name) && (
+          {(place.address ||
+            place.postcode ||
+            place.location_name) && (
             <section className="rounded-[2rem] bg-neutral-50 p-5">
               <div className="flex items-center gap-2 text-black">
                 <MapPin size={20} />
@@ -281,13 +288,14 @@ export default async function PlacePage({
             {ownerSlug ? (
               <Link
                 href={`/${ownerSlug}`}
-                className="mt-2 block text-lg font-black text-black underline underline-offset-4"
-                style={{ textDecorationColor: brandColour }}
+                className="mt-2 block text-lg font-black text-black underline decoration-neutral-300 underline-offset-4"
               >
-                {ownerName}
+                {pageName(place)}
               </Link>
             ) : (
-              <p className="mt-2 text-lg font-black text-black">{ownerName}</p>
+              <p className="mt-2 text-lg font-black text-black">
+                {pageName(place)}
+              </p>
             )}
           </section>
         </aside>
@@ -295,21 +303,25 @@ export default async function PlacePage({
 
       {(place.images?.length ?? 0) > 0 && (
         <section className="mt-6">
-          <h2 className="mb-4 text-3xl font-black text-black">Photos</h2>
+          <h2 className="mb-4 text-3xl font-black text-black">
+            Photos
+          </h2>
 
           <div className="grid gap-4 md:grid-cols-3">
-            {place.images?.map((image: string, index: number) => (
-              <div
-                key={image}
-                className="aspect-square overflow-hidden rounded-[2rem] bg-neutral-100"
-              >
-                <img
-                  src={image}
-                  alt={`${place.title} photo ${index + 1}`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ))}
+            {place.images?.map(
+              (image: string, index: number) => (
+                <div
+                  key={image}
+                  className="overflow-hidden rounded-[2rem] bg-neutral-100"
+                >
+                  <img
+                    src={image}
+                    alt={`${place.title} photo ${index + 1}`}
+                    className="h-72 w-full object-cover"
+                  />
+                </div>
+              )
+            )}
           </div>
         </section>
       )}
