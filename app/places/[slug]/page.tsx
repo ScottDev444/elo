@@ -27,6 +27,7 @@ type Place = {
   location_name?: string;
   address?: string;
   postcode?: string;
+  brand_color?: string;
   tags?: string[];
   images?: string[];
   opening_hours?: Record<string, OpeningDay>;
@@ -55,6 +56,10 @@ const dayLabels = [
   ["saturday", "Saturday"],
   ["sunday", "Sunday"],
 ] as const;
+
+function isSafeHexColour(value?: string) {
+  return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
+}
 
 function isLocalPartner(place: Place) {
   if (Array.isArray(place.groups)) {
@@ -143,6 +148,7 @@ export default async function PlacePage({
       location_name,
       address,
       postcode,
+      brand_color,
       tags,
       images,
       opening_hours,
@@ -158,20 +164,27 @@ export default async function PlacePage({
   const open = isPlaceOpen(place);
   const ownerSlug = pageSlug(place);
 
+  const brandColour = isSafeHexColour(place.brand_color)
+    ? place.brand_color
+    : "#047857";
+
   return (
     <main className="min-h-screen bg-white px-6 pb-12 pt-4 md:p-8">
       <div className="mb-5">
         <BackButton />
       </div>
 
-      <section className="rounded-[2rem] bg-emerald-700 p-6 text-white shadow-xl">
+      <section
+        className="rounded-[2rem] p-6 text-white shadow-xl"
+        style={{ backgroundColor: brandColour }}
+      >
         <div className="flex flex-col items-start gap-6 md:flex-row">
           <div className="flex-1">
             <div className="mb-3 flex flex-wrap gap-2">
               <span
                 className={`rounded-full px-3 py-1 text-xs font-black ${
                   open
-                    ? "bg-white text-emerald-800"
+                    ? "bg-white text-black"
                     : "bg-white/20 text-white"
                 }`}
               >
@@ -225,13 +238,22 @@ export default async function PlacePage({
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-[2rem] bg-emerald-50 p-5">
-            <div className="flex items-center gap-2 text-emerald-900">
+          <section
+            className="rounded-[2rem] p-5"
+            style={{ backgroundColor: `${brandColour}14` }}
+          >
+            <div
+              className="flex items-center gap-2"
+              style={{ color: brandColour }}
+            >
               <Clock3 size={20} />
               <h2 className="font-black">Opening hours</h2>
             </div>
 
-            <p className="mt-3 text-sm font-black text-emerald-900">
+            <p
+              className="mt-3 text-sm font-black"
+              style={{ color: brandColour }}
+            >
               {todayLabel(place)}
             </p>
 
@@ -288,7 +310,8 @@ export default async function PlacePage({
             {ownerSlug ? (
               <Link
                 href={`/${ownerSlug}`}
-                className="mt-2 block text-lg font-black text-black underline decoration-neutral-300 underline-offset-4"
+                className="mt-2 block text-lg font-black text-black underline underline-offset-4"
+                style={{ textDecorationColor: brandColour }}
               >
                 {pageName(place)}
               </Link>
@@ -312,12 +335,12 @@ export default async function PlacePage({
               (image: string, index: number) => (
                 <div
                   key={image}
-                  className="overflow-hidden rounded-[2rem] bg-neutral-100"
+                  className="aspect-square overflow-hidden rounded-[2rem] bg-neutral-100"
                 >
                   <img
                     src={image}
                     alt={`${place.title} photo ${index + 1}`}
-                    className="h-72 w-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 </div>
               )
