@@ -1,0 +1,352 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  ArrowLeft,
+  Clock3,
+  MapPin,
+  Tag,
+  ImageIcon,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+type OpeningDay = {
+  closed?: boolean;
+  open?: string;
+  close?: string;
+  is24h?: boolean;
+  is_24_7?: boolean;
+};
+
+type Place = {
+  id: string;
+  slug?: string;
+  title: string;
+  description?: string;
+  location_name?: string;
+  address?: string;
+  postcode?: string;
+  tags?: string[];
+  images?: string[];
+  opening_hours?: Record<string, OpeningDay>;
+  metadata?: {
+    open_24_7?: boolean;
+  };
+  groups?:
+    | {
+        name?: string;
+        slug?: string;
+        is_local_partner?: boolean;
+      }
+    | {
+        name?: string;
+        slug?: string;
+        is_local_partner?: boolean;
+      }[];
+};
+
+const dayLabels = [
+  ["monday", "Monday"],
+  ["tuesday", "Tuesday"],
+  ["wednesday", "Wednesday"],
+  ["thursday", "Thursday"],
+  ["friday", "Friday"],
+  ["saturday", "Saturday"],
+  ["sunday", "Sunday"],
+] as const;
+
+function isLocalPartner(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups.some(
+      (group) => group.is_local_partner === true
+    );
+  }
+
+  return place.groups?.is_local_partner === true;
+}
+
+function pageName(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups[0]?.name ?? "East Lothian Online";
+  }
+
+  return place.groups?.name ?? "East Lothian Online";
+}
+
+function pageSlug(place: Place) {
+  if (Array.isArray(place.groups)) {
+    return place.groups[0]?.slug ?? "";
+  }
+
+  return place.groups?.slug ?? "";
+}
+
+function getTodayKey() {
+  const days = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+
+  return days[new Date().getDay()];
+}
+
+function isPlaceOpen(place: Place) {
+  if (place.metadata?.open_24_7) return true;
+
+  const todayHours = place.opening_hours?.[getTodayKey()];
+
+  if (!todayHours || todayHours.closed) return false;
+  if (todayHours.is24h || todayHours.is_24_7) return true;
+  if (!todayHours.open || !todayHours.close) return false;
+
+  const currentTime = new Date().toTimeString().slice(0, 5);
+
+  return currentTime >= todayHours.open && currentTime <= todayHours.close;
+}
+
+function todayLabel(place: Place) {
+  if (place.metadata?.open_24_7) return "Open 24/7";
+
+  const todayHours = place.opening_hours?.[getTodayKey()];
+
+  if (!todayHours) return "Hours unavailable";
+  if (todayHours.closed) return "Closed today";
+  if (todayHours.is24h || todayHours.is_24_7) {
+    return "Open 24/7";
+  }
+
+  return `Open today ${todayHours.open} - ${todayHours.close}`;
+}
+
+export default async function PlacePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const supabase = await createClient();
+
+  const { data: place } = await supabase
+    .from("places")
+    .select(`
+      id,
+      slug,
+      title,
+      description,
+      location_name,
+      address,
+      postcode,
+      tags,
+      images,
+      opening_hours,
+      metadata,
+      groups(name, slug, is_local_partner)
+    `)
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!place) notFound();
+
+  const open = isPlaceOpen(place);
+  const ownerSlug = pageSlug(place);
+
+  return (
+    <main className="min-h-screen bg-white px-6 pb-12 pt-4 md:p-8">
+      <Link
+        href="/explore"
+        className="mb-5 inline-flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2 text-sm font-black text-black"
+      >
+        <ArrowLeft size={16} />
+        Back to Explore
+      </Link>
+
+      <section className="overflow-hidden rounded-[2rem] bg-black text-white shadow-xl">
+        {place.images?.[0] ? (
+          <div className="relative aspect-[16/10] w-full overflow-hidden md:aspect-[21/9]">
+            <img
+              src={place.images[0]}
+              alt={place.title}
+              className="h-full w-full object-cover"
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
+              <div className="mb-3 flex flex-wrap gap-2">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                    open
+                      ? "bg-emerald-400 text-emerald-950"
+                      : "bg-white/20 text-white"
+                  }`}
+                >
+                  {todayLabel(place)}
+                </span>
+
+                {isLocalPartner(place) && (
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800">
+                    Local Partner
+                  </span>
+                )}
+              </div>
+
+              <h1 className="max-w-3xl text-5xl font-black leading-none tracking-tight md:text-7xl">
+                {place.title}
+              </h1>
+
+              {place.location_name && (
+                <div className="mt-4 flex items-center gap-2 text-sm font-bold text-white/85">
+                  <MapPin size={18} />
+                  {place.location_name}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 md:p-10">
+            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[1.5rem] bg-white/10">
+              <ImageIcon size={32} />
+            </div>
+
+            <h1 className="max-w-3xl text-5xl font-black leading-none tracking-tight md:text-7xl">
+              {place.title}
+            </h1>
+
+            <p className="mt-4 text-sm font-bold text-white/70">
+              {todayLabel(place)}
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+        <div className="rounded-[2rem] bg-neutral-50 p-6">
+          <h2 className="text-2xl font-black text-black">About</h2>
+
+          <p className="mt-4 whitespace-pre-wrap text-base font-semibold leading-relaxed text-neutral-700">
+            {place.description || "No description yet."}
+          </p>
+
+          {!!place.tags?.length && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {place.tags.map((tag: string) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-black text-neutral-700"
+                >
+                  <Tag size={12} />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-[2rem] bg-emerald-50 p-5">
+            <div className="flex items-center gap-2 text-emerald-900">
+              <Clock3 size={20} />
+              <h2 className="font-black">Opening hours</h2>
+            </div>
+
+            <p className="mt-3 text-sm font-black text-emerald-900">
+              {todayLabel(place)}
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {dayLabels.map(([key, label]) => {
+                const day = place.opening_hours?.[key];
+
+                return (
+                  <div
+                    key={key}
+                    className="flex justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
+                  >
+                    <span className="font-bold text-black">
+                      {label}
+                    </span>
+
+                    <span className="text-right font-semibold text-neutral-600">
+                      {place.metadata?.open_24_7
+                        ? "24 hours"
+                        : !day || day.closed
+                        ? "Closed"
+                        : day.is24h || day.is_24_7
+                        ? "24 hours"
+                        : `${day.open} - ${day.close}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {(place.address ||
+            place.postcode ||
+            place.location_name) && (
+            <section className="rounded-[2rem] bg-neutral-50 p-5">
+              <div className="flex items-center gap-2 text-black">
+                <MapPin size={20} />
+                <h2 className="font-black">Location</h2>
+              </div>
+
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-neutral-700">
+                {[place.location_name, place.address, place.postcode]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            </section>
+          )}
+
+          <section className="rounded-[2rem] bg-neutral-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-neutral-400">
+              Listed by
+            </p>
+
+            {ownerSlug ? (
+              <Link
+                href={`/${ownerSlug}`}
+                className="mt-2 block text-lg font-black text-black underline decoration-neutral-300 underline-offset-4"
+              >
+                {pageName(place)}
+              </Link>
+            ) : (
+              <p className="mt-2 text-lg font-black text-black">
+                {pageName(place)}
+              </p>
+            )}
+          </section>
+        </aside>
+      </section>
+
+      {(place.images?.length ?? 0) > 1 && (
+        <section className="mt-6">
+          <h2 className="mb-4 text-3xl font-black text-black">
+            Photos
+          </h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {place.images
+              ?.slice(1)
+              .map((image: string, index: number) => (
+                <img
+                  key={image}
+                  src={image}
+                  alt={`${place.title} photo ${index + 2}`}
+                  className="aspect-[16/10] w-full rounded-[2rem] object-cover"
+                />
+              ))}
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}

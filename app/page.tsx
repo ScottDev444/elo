@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, CalendarDays, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import PostCard from "@/components/PostCard";
+import PostCardPlace from "@/components/PostCardPlace";
 import HomeHero from "@/components/HomeHero";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +133,54 @@ function getThisWeekend(today: Date) {
   return { start: saturday, end: sunday };
 }
 
+
+function getCurrentTimeKey() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
+function getTodayOpeningKey() {
+  const days = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+
+  return days[new Date().getDay()];
+}
+
+function isPlaceOpenNow(place: any) {
+  if (place.metadata?.open_24_7 === true) return true;
+
+  const todayKey = getTodayOpeningKey();
+  const todayHours = place.opening_hours?.[todayKey];
+
+  if (!todayHours) return false;
+  if (todayHours.closed) return false;
+  if (todayHours.is24h || todayHours.open_24_7) return true;
+  if (!todayHours.open || !todayHours.close) return false;
+
+  const currentTime = getCurrentTimeKey();
+
+  return currentTime >= todayHours.open && currentTime <= todayHours.close;
+}
+
+function isPlaceLocalPartner(place: any) {
+  return place.groups?.is_local_partner === true;
+}
+
+function sortPlacesFavouringLocalPartners(places: any[]) {
+  const shuffled = shuffle(places);
+
+  return shuffled.sort((a, b) => {
+    if (isPlaceLocalPartner(a) === isPlaceLocalPartner(b)) return 0;
+    return isPlaceLocalPartner(a) ? -1 : 1;
+  });
+}
+
 function getNextWeek(today: Date) {
   const day = today.getDay();
 
@@ -179,6 +228,27 @@ export default async function HomePage() {
     .order("created_at", { ascending: false })
     .limit(150);
 
+
+  const { data: places } = await supabase
+    .from("places")
+    .select(`
+      id,
+      slug,
+      title,
+      description,
+      location_name,
+      address,
+      postcode,
+      tags,
+      images,
+      opening_hours,
+      metadata,
+      is_active,
+      groups(name, is_local_partner)
+    `)
+    .eq("is_active", true)
+    .limit(100);
+
   const allPosts = posts ?? [];
   const today = normaliseDate(new Date());
   const day = today.getDay();
@@ -212,6 +282,11 @@ export default async function HomePage() {
   const alertPosts = shuffle(
     allPosts.filter((p: any) => p.type === "update" && !isExpired(p, today))
   ).slice(0, 20);
+
+  const openPlaces = sortPlacesFavouringLocalPartners(
+    (places ?? []).filter((place: any) => isPlaceOpenNow(place))
+  ).slice(0, 10);
+
 
   const upcomingTitle = showNextWeek
     ? "Next Week in East Lothian 📅"
@@ -278,6 +353,36 @@ export default async function HomePage() {
           isLocalPartner={isLocalPartner(post)}
         />
       ))}
+
+
+
+      {openPlaces.length > 0 && (
+        <>
+          <div className="mb-4 mt-12 flex items-center justify-between gap-4">
+            <h2 className="text-3xl font-black tracking-tight text-black">
+              Places
+            </h2>
+
+            <Link
+              href="/explore"
+              className="rounded-full bg-black px-4 py-2 text-sm font-black text-white"
+            >
+              Explore East Lothian
+            </Link>
+          </div>
+
+          <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-3 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3">
+            {openPlaces.map((place: any) => (
+              <div
+                key={place.id}
+                className="w-[82vw] shrink-0 snap-start md:w-auto [&_article]:h-full [&_h2]:text-xl md:[&_h2]:text-lg [&_p]:text-sm md:[&_p]:text-xs [&_.aspect-\[16\/9\]]:md:aspect-[4/3]"
+              >
+                <PostCardPlace place={place} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <Link href="/calendar" className="block">
         <section className="mt-12 overflow-hidden rounded-[2rem] bg-emerald-800 p-6 text-white shadow-xl">
