@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock3, MapPin, Tag } from "lucide-react";
+import { Clock3, MapPin } from "lucide-react";
 import { useMemo } from "react";
 
 type OpeningDay = {
@@ -20,7 +20,6 @@ type Place = {
   location_name?: string;
   address?: string;
   postcode?: string;
-  tags?: string[];
   images?: string[];
   opening_hours?: Record<string, OpeningDay>;
   metadata?: {
@@ -31,6 +30,15 @@ type Place = {
 type Props = {
   place: Place;
 };
+
+function minutesFromTime(time?: string) {
+  if (!time) return null;
+
+  const [hours, minutes] = time.split(":").map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return hours * 60 + minutes;
+}
 
 export default function PostCardPlace({ place }: Props) {
   const todayKey = useMemo(() => {
@@ -50,95 +58,68 @@ export default function PostCardPlace({ place }: Props) {
   const todayHours = place.opening_hours?.[todayKey];
 
   const isAlwaysOpen =
-    place.metadata?.open_24_7 ||
-    todayHours?.is24h ||
-    todayHours?.is_24_7;
+    place.metadata?.open_24_7 || todayHours?.is24h || todayHours?.is_24_7;
 
-  const openLabel = useMemo(() => {
-    if (isAlwaysOpen) return "Open 24/7";
+  const isClosingSoon = useMemo(() => {
+    if (isAlwaysOpen || !todayHours || todayHours.closed) return false;
+
+    const closeMinutes = minutesFromTime(todayHours.close);
+    if (closeMinutes === null) return false;
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return closeMinutes - nowMinutes > 0 && closeMinutes - nowMinutes <= 60;
+  }, [todayHours, isAlwaysOpen]);
+
+  const statusLabel = useMemo(() => {
+    if (isClosingSoon) return "Closing soon";
+    if (isAlwaysOpen) return "Open now";
     if (!todayHours) return "Hours unavailable";
     if (todayHours.closed) return "Closed today";
 
-    return `Open today ${todayHours.open} - ${todayHours.close}`;
-  }, [todayHours, isAlwaysOpen]);
+    return `${todayHours.open} - ${todayHours.close}`;
+  }, [todayHours, isAlwaysOpen, isClosingSoon]);
+
+  const imageUrl = place.images?.[0];
 
   const card = (
-    <article className="h-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      {place.images?.[0] && (
-        <div className="relative aspect-square w-full overflow-hidden">
-          <img
-            src={place.images[0]}
-            alt={place.title}
-            className="h-full w-full object-cover"
-          />
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-
-          <div className="absolute bottom-4 left-4 right-4">
-            <h2 className="text-2xl font-black text-white">
-              {place.title}
-            </h2>
-
-            {place.location_name && (
-              <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-white/90">
-                <MapPin size={16} />
-                <span>{place.location_name}</span>
-              </div>
-            )}
-          </div>
-        </div>
+    <article className="group relative aspect-square h-full w-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-neutral-100 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={place.title}
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-100 via-white to-neutral-100" />
       )}
 
-      <div className="p-5">
-        {!place.images?.[0] && (
-          <>
-            <h2 className="text-2xl font-black text-black">
-              {place.title}
-            </h2>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/75 via-45% to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/70 to-transparent" />
 
-            {place.location_name && (
-              <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-neutral-500">
-                <MapPin size={16} />
-                <span>{place.location_name}</span>
-              </div>
-            )}
-          </>
+      <div className="absolute inset-x-0 bottom-0 p-5">
+        <h2 className="line-clamp-2 text-2xl font-black leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          {place.title}
+        </h2>
+
+        {place.location_name && (
+          <div className="mt-2 flex items-center gap-2 text-sm font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
+            <MapPin size={16} />
+            <span className="line-clamp-1">{place.location_name}</span>
+          </div>
         )}
 
-        <div className="mt-5 rounded-2xl bg-emerald-50 p-4">
-          <div className="flex items-center gap-2 text-emerald-900">
-            <Clock3 size={18} />
-            <p className="text-sm font-black">{openLabel}</p>
-          </div>
+        <div
+          className={`mt-4 flex items-center gap-2 rounded-2xl px-4 py-3 shadow-sm ${
+            isClosingSoon
+              ? "bg-red-600 text-white"
+              : "bg-white text-emerald-950"
+          }`}
+        >
+          <Clock3 size={17} />
+          <p className="text-sm font-black">{statusLabel}</p>
         </div>
-
-        {!!place.tags?.length && (
-          <div className="mt-5 flex flex-wrap gap-2">
-            {place.tags.slice(0, 4).map((tag: string) => (
-              <div
-                key={tag}
-                className="flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-2 text-xs font-bold text-neutral-700"
-              >
-                <Tag size={12} />
-                <span>{tag}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(place.address || place.postcode) && (
-          <div className="mt-5 rounded-2xl bg-neutral-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-neutral-500">
-              Address
-            </p>
-
-            <p className="mt-2 text-sm font-semibold text-black">
-              {[place.address, place.postcode]
-                .filter(Boolean)
-                .join(", ")}
-            </p>
-          </div>
-        )}
       </div>
     </article>
   );
