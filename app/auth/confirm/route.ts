@@ -1,6 +1,6 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -9,27 +9,22 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? "/reset-password";
 
-  const redirectTo = request.nextUrl.clone();
-  redirectTo.pathname = next;
-
-  if (token_hash && type) {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash,
-      type,
-    });
-
-    if (!error) {
-      return NextResponse.redirect(redirectTo);
-    }
+  if (!token_hash || !type) {
+    return NextResponse.redirect(new URL("/auth", request.url));
   }
 
-  redirectTo.pathname = "/auth";
-  redirectTo.searchParams.set("error", "expired");
+  const supabase = await createClient();
 
-  return NextResponse.redirect(redirectTo);
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash,
+    type,
+  });
+
+  if (error) {
+    return NextResponse.redirect(
+      new URL("/auth?error=expired", request.url)
+    );
+  }
+
+  return NextResponse.redirect(new URL(next, request.url));
 }
