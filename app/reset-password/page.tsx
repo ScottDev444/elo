@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -15,33 +15,17 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function setupResetSession() {
-      const hash = window.location.hash;
+    async function checkResetSession() {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
-      if (!hash.includes("access_token")) {
-        setMessage("Invalid or expired reset link. Please request a new one.");
-        setChecking(false);
-        return;
-      }
-
-      const params = new URLSearchParams(hash.substring(1));
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-
-      if (!access_token || !refresh_token) {
-        setMessage("Invalid or expired reset link. Please request a new one.");
-        setChecking(false);
-        return;
-      }
-
-      const { error } = await supabase.auth.setSession({
-        access_token,
-        refresh_token,
-      });
-
-      if (error) {
-        setMessage("Reset link expired or invalid. Please request a new one.");
+      if (error || !session) {
         setReady(false);
+        setMessage(
+          "Invalid or expired reset link. Please request a new one."
+        );
       } else {
         setReady(true);
         setMessage("");
@@ -50,12 +34,14 @@ export default function ResetPasswordPage() {
       setChecking(false);
     }
 
-    setupResetSession();
-  }, [supabase]);
+    checkResetSession();
+  }, []);
 
-  const handleReset = async () => {
+  async function handleReset() {
     if (!ready) {
-      setMessage("Reset session not ready. Please request a new reset link.");
+      setMessage(
+        "Reset session not ready. Please request a new reset link."
+      );
       return;
     }
 
@@ -72,7 +58,9 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
 
     if (error) {
       setMessage(error.message);
@@ -82,20 +70,25 @@ export default function ResetPasswordPage() {
 
     await supabase.auth.signOut();
 
-    setMessage("Password updated! Please sign in with your new password.");
+    setMessage(
+      "Password updated. Please sign in with your new password."
+    );
     setLoading(false);
 
-    setTimeout(() => router.push("/auth"), 1500);
-  };
+    setTimeout(() => {
+      router.push("/auth");
+      router.refresh();
+    }, 1500);
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-        <h1 className="text-xl font-semibold text-gray-900 mb-2 text-center">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h1 className="mb-2 text-center text-xl font-semibold text-gray-900">
           Reset your password
         </h1>
 
-        <p className="text-sm text-gray-600 text-center mb-5">
+        <p className="mb-5 text-center text-sm text-gray-600">
           Enter your new password below.
         </p>
 
@@ -103,28 +96,39 @@ export default function ResetPasswordPage() {
           type="password"
           placeholder="New password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg mb-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          onChange={(event) => setPassword(event.target.value)}
+          disabled={!ready || checking || loading}
+          autoComplete="new-password"
+          className="mb-3 w-full rounded-lg border border-gray-300 p-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100"
         />
 
         <input
           type="password"
           placeholder="Confirm new password"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg mb-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          onChange={(event) =>
+            setConfirmPassword(event.target.value)
+          }
+          disabled={!ready || checking || loading}
+          autoComplete="new-password"
+          className="mb-3 w-full rounded-lg border border-gray-300 p-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100"
         />
 
         <button
+          type="button"
           onClick={handleReset}
           disabled={checking || loading || !ready}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-2.5 rounded-lg font-medium transition"
+          className="w-full rounded-lg bg-emerald-600 p-2.5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          {checking ? "Checking link..." : loading ? "Updating..." : "Update password"}
+          {checking
+            ? "Checking link..."
+            : loading
+              ? "Updating..."
+              : "Update password"}
         </button>
 
         {message && (
-          <p className="mt-3 text-sm text-center text-gray-600">
+          <p className="mt-3 text-center text-sm text-gray-600">
             {message}
           </p>
         )}
