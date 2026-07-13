@@ -1,25 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+type Mode = "signin" | "signup" | "reset";
+type MessageType = "error" | "success";
 
 export default function SignInBox() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<"signin" | "signup" | "reset">(
-    "signin"
-  );
+  const [mode, setMode] = useState<Mode>("signin");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"error" | "success">(
-    "error"
-  );
+  const [messageType, setMessageType] =
+    useState<MessageType>("error");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (loading) return;
@@ -32,13 +32,13 @@ export default function SignInBox() {
     const cleanUsername = username.trim();
 
     if (mode === "reset") {
-      const redirectTo = `${window.location.origin}/reset-password`;
+      const redirectTo =
+        `${window.location.origin}/auth/confirm` +
+        `?next=${encodeURIComponent("/reset-password")}`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(
         cleanEmail,
-        {
-          redirectTo,
-        }
+        { redirectTo }
       );
 
       if (error) {
@@ -70,27 +70,26 @@ export default function SignInBox() {
 
       const userId = data.user?.id;
 
-      if (userId) {
-        const { data: userRow, error: userError } = await supabase
-          .from("users")
-          .select("has_seen_welcome")
-          .eq("id", userId)
-          .single();
-
-        if (userError) {
-          setMessage(userError.message);
-          setLoading(false);
-          return;
-        }
-
-        router.push(
-          userRow?.has_seen_welcome ? "/" : "/welcome"
-        );
-        router.refresh();
+      if (!userId) {
+        setMessage("Unable to sign in.");
+        setLoading(false);
         return;
       }
 
-      setLoading(false);
+      const { data: userRow, error: userError } = await supabase
+        .from("users")
+        .select("has_seen_welcome")
+        .eq("id", userId)
+        .single();
+
+      if (userError) {
+        setMessage(userError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push(userRow?.has_seen_welcome ? "/" : "/welcome");
+      router.refresh();
       return;
     }
 
@@ -133,7 +132,7 @@ export default function SignInBox() {
     router.refresh();
   }
 
-  function changeMode(nextMode: "signin" | "signup" | "reset") {
+  function changeMode(nextMode: Mode) {
     if (loading) return;
 
     setMode(nextMode);
@@ -263,10 +262,10 @@ export default function SignInBox() {
         {loading
           ? "One moment..."
           : mode === "signin"
-          ? "Sign in"
-          : mode === "signup"
-          ? "Create account"
-          : "Send reset link"}
+            ? "Sign in"
+            : mode === "signup"
+              ? "Create account"
+              : "Send reset link"}
       </button>
     </form>
   );
