@@ -32,9 +32,7 @@ export default function SignInBox() {
     const cleanUsername = username.trim();
 
     if (mode === "reset") {
-      const redirectTo =
-        `${window.location.origin}/auth/confirm` +
-        `?next=${encodeURIComponent("/reset-password")}`;
+      const redirectTo = `${window.location.origin}/reset-password`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(
         cleanEmail,
