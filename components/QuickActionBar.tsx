@@ -477,6 +477,8 @@ export default function QuickActionBar() {
             id,
             title,
             type,
+            metadata,
+            expires_at,
             groups(name, slug)
           `)
           .limit(750),
@@ -560,7 +562,7 @@ export default function QuickActionBar() {
   ]);
 
   useEffect(() => {
-    if (query.trim().length >= 2) {
+    if (query.trim().length >= 1) {
       setRandomSeed((current) => current + 1);
     }
   }, [query]);
@@ -604,7 +606,7 @@ export default function QuickActionBar() {
   >(() => {
     const cleanedQuery = query.trim();
 
-    if (cleanedQuery.length < 2) {
+    if (cleanedQuery.length < 1) {
       return [];
     }
 
@@ -873,7 +875,7 @@ export default function QuickActionBar() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 pb-24">
-            {query.trim().length < 2 ? (
+            {query.trim().length < 1 ? (
               <div className="rounded-[2rem] bg-emerald-800 p-6 text-white">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-100/70">
                   Search
