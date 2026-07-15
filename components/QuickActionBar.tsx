@@ -474,8 +474,10 @@ export default function QuickActionBar() {
         supabase
           .from("posts")
           .select(`
-            *,
-            groups(*)
+            id,
+            title,
+            type,
+            groups(name, slug)
           `)
           .limit(750),
 
@@ -959,7 +961,7 @@ export default function QuickActionBar() {
                         className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="shrink-0 rounded-2xl bg-blue-100 p-3 text-blue-800">
+                          <div className="shrink-0 rounded-2xl bg-emerald-100 p-3 text-emerald-800">
                             <MapPin size={20} />
                           </div>
 
