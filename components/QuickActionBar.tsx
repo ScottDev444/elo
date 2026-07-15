@@ -21,23 +21,25 @@ type GenericRecord = Record<string, any>;
 
 type SearchPost = GenericRecord & {
   id: string;
-  title?: string | null;
-  type?: string | null;
+  title: string;
+  type: string;
   metadata?: GenericRecord | null;
-  groups?: GenericRecord | GenericRecord[] | null;
+  groups?:
+    | GenericRecord
+    | GenericRecord[]
+    | null;
 };
 
 type SearchPage = GenericRecord & {
   id: string;
-  name?: string | null;
-  slug?: string | null;
+  name: string;
+  slug: string;
   page_type?: string | null;
 };
 
 type SearchPlace = GenericRecord & {
   id: string;
   page_id?: string | null;
-  groups?: GenericRecord | GenericRecord[] | null;
 };
 
 type SearchResult =
@@ -49,6 +51,7 @@ type SearchResult =
   | {
       kind: "place";
       place: SearchPlace;
+      page?: SearchPage;
       random: number;
     }
   | {
@@ -62,11 +65,10 @@ type SearchResult =
       random: number;
     };
 
-function getSingleRelation<T>(
-  value: T | T[] | null | undefined,
-): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
+function getPostGroup(post: SearchPost) {
+  return Array.isArray(post.groups)
+    ? post.groups[0]
+    : post.groups;
 }
 
 function normaliseText(value: unknown) {
@@ -78,23 +80,28 @@ function normaliseText(value: unknown) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function matchesSearch(query: string, values: unknown[]) {
-  const cleanQuery = normaliseText(query);
+function matchesSearch(
+  query: string,
+  values: unknown[],
+) {
+  const cleanedQuery = normaliseText(query);
 
-  if (!cleanQuery) return false;
+  if (!cleanedQuery) return false;
 
   return values.some((value) => {
     if (Array.isArray(value)) {
       return value.some((item) =>
-        normaliseText(item).includes(cleanQuery),
+        normaliseText(item).includes(cleanedQuery),
       );
     }
 
-    return normaliseText(value).includes(cleanQuery);
+    return normaliseText(value).includes(cleanedQuery);
   });
 }
 
-function isLocalPartner(record: GenericRecord | null | undefined) {
+function isLocalPartner(
+  record: GenericRecord | null | undefined,
+) {
   if (!record) return false;
 
   return Boolean(
@@ -109,7 +116,36 @@ function isLocalPartner(record: GenericRecord | null | undefined) {
   );
 }
 
-function extractDate(value: unknown): string | null {
+function isAlert(post: SearchPost) {
+  const type = String(post.type ?? "").toLowerCase();
+
+  const publicType = String(
+    post.metadata?.public_type ??
+      post.public_type ??
+      "",
+  ).toLowerCase();
+
+  return (
+    type === "alert" ||
+    type === "update" ||
+    publicType === "alert" ||
+    publicType === "update"
+  );
+}
+
+function isDeal(post: SearchPost) {
+  const type = String(post.type ?? "").toLowerCase();
+
+  const publicType = String(
+    post.metadata?.public_type ??
+      post.public_type ??
+      "",
+  ).toLowerCase();
+
+  return type === "deal" || publicType === "deal";
+}
+
+function extractDate(value: unknown) {
   if (!value) return null;
 
   if (typeof value === "string") {
@@ -119,15 +155,15 @@ function extractDate(value: unknown): string | null {
   if (typeof value === "object") {
     const record = value as GenericRecord;
 
-    const possibleDate =
+    const date =
       record.date ??
       record.start ??
       record.start_date ??
       record.event_date ??
       record.active_date;
 
-    if (typeof possibleDate === "string") {
-      return possibleDate.slice(0, 10);
+    if (typeof date === "string") {
+      return date.slice(0, 10);
     }
   }
 
@@ -136,21 +172,21 @@ function extractDate(value: unknown): string | null {
 
 function getPostDates(post: SearchPost) {
   const metadata = post.metadata ?? {};
+  const dates: string[] = [];
 
-  const possibleArrays = [
+  const dateArrays = [
     metadata.active_dates,
-    metadata.dates,
     metadata.event_dates,
+    metadata.dates,
     post.active_dates,
+    post.event_dates,
     post.dates,
   ];
 
-  const dates: string[] = [];
+  for (const dateArray of dateArrays) {
+    if (!Array.isArray(dateArray)) continue;
 
-  for (const possibleArray of possibleArrays) {
-    if (!Array.isArray(possibleArray)) continue;
-
-    for (const value of possibleArray) {
+    for (const value of dateArray) {
       const date = extractDate(value);
 
       if (date) {
@@ -160,16 +196,16 @@ function getPostDates(post: SearchPost) {
   }
 
   const individualDates = [
-    post.event_date,
-    post.event_start,
-    post.event_end,
-    post.start_date,
-    post.end_date,
     metadata.event_date,
     metadata.event_start,
     metadata.event_end,
     metadata.start_date,
     metadata.end_date,
+    post.event_date,
+    post.event_start,
+    post.event_end,
+    post.start_date,
+    post.end_date,
   ];
 
   for (const value of individualDates) {
@@ -183,6 +219,7 @@ function getPostDates(post: SearchPost) {
   return [...new Set(dates)]
     .filter((date) => {
       const parsed = new Date(`${date}T12:00:00`);
+
       return !Number.isNaN(parsed.getTime());
     })
     .sort((a, b) => a.localeCompare(b));
@@ -190,56 +227,11 @@ function getPostDates(post: SearchPost) {
 
 function getMostRecentPostDate(post: SearchPost) {
   const dates = getPostDates(post);
+
   return dates[dates.length - 1] ?? null;
 }
 
-function isAlert(post: SearchPost) {
-  const publicType = String(
-    post.metadata?.public_type ??
-      post.public_type ??
-      "",
-  ).toLowerCase();
-
-  const type = String(post.type ?? "").toLowerCase();
-
-  return (
-    type === "alert" ||
-    type === "update" ||
-    publicType === "alert" ||
-    publicType === "update"
-  );
-}
-
-function isDeal(post: SearchPost) {
-  const publicType = String(
-    post.metadata?.public_type ??
-      post.public_type ??
-      "",
-  ).toLowerCase();
-
-  const type = String(post.type ?? "").toLowerCase();
-
-  return type === "deal" || publicType === "deal";
-}
-
 function isPostExpired(post: SearchPost) {
-  if (isAlert(post)) {
-    const explicitExpiry =
-      post.expires_at ??
-      post.expiry_date ??
-      post.metadata?.expires_at ??
-      post.metadata?.expiry_date;
-
-    if (!explicitExpiry) return false;
-
-    const expiry = new Date(explicitExpiry);
-
-    return (
-      !Number.isNaN(expiry.getTime()) &&
-      expiry.getTime() < Date.now()
-    );
-  }
-
   const explicitExpiry =
     post.expires_at ??
     post.expiry_date ??
@@ -257,6 +249,10 @@ function isPostExpired(post: SearchPost) {
     }
   }
 
+  if (isAlert(post)) {
+    return false;
+  }
+
   const mostRecentDate = getMostRecentPostDate(post);
 
   if (!mostRecentDate) {
@@ -266,7 +262,10 @@ function isPostExpired(post: SearchPost) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const finalDate = new Date(`${mostRecentDate}T12:00:00`);
+  const finalDate = new Date(
+    `${mostRecentDate}T12:00:00`,
+  );
+
   finalDate.setHours(0, 0, 0, 0);
 
   return finalDate < today;
@@ -289,23 +288,25 @@ function formatPostDate(post: SearchPost) {
   }).format(parsed);
 }
 
-function getPlaceName(place: SearchPlace) {
-  const group = getSingleRelation(place.groups);
-
+function getPlaceName(
+  place: SearchPlace,
+  page?: SearchPage,
+) {
   return (
     place.title ??
     place.name ??
     place.location_name ??
-    group?.name ??
+    page?.name ??
     "Local place"
   );
 }
 
-function getPlaceHref(place: SearchPlace) {
-  const group = getSingleRelation(place.groups);
-
-  if (group?.slug) {
-    return `/${group.slug}`;
+function getPlaceHref(
+  place: SearchPlace,
+  page?: SearchPage,
+) {
+  if (page?.slug) {
+    return `/${page.slug}`;
   }
 
   if (place.slug) {
@@ -315,38 +316,74 @@ function getPlaceHref(place: SearchPlace) {
   return `/places/${place.id}`;
 }
 
-function resultIsLocalPartner(result: SearchResult) {
+function getPlaceDescription(
+  place: SearchPlace,
+  page?: SearchPage,
+) {
+  return (
+    place.location_name ??
+    place.address ??
+    place.town ??
+    page?.name ??
+    "Place"
+  );
+}
+
+function resultIsLocalPartner(
+  result: SearchResult,
+) {
   if (result.kind === "page") {
     return isLocalPartner(result.page);
   }
 
   if (result.kind === "place") {
-    return isLocalPartner(
-      getSingleRelation(result.place.groups),
+    return (
+      isLocalPartner(result.page) ||
+      isLocalPartner(result.place)
     );
   }
 
-  return isLocalPartner(
-    getSingleRelation(result.post.groups),
-  );
+  return isLocalPartner(getPostGroup(result.post));
 }
 
 export default function QuickActionBar() {
   const [isMobile, setIsMobile] = useState(false);
-  const [hasApprovedPage, setHasApprovedPage] =
+
+  const [
+    hasApprovedPage,
+    setHasApprovedPage,
+  ] = useState(false);
+
+  const [searchOpen, setSearchOpen] =
     useState(false);
 
-  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const [allPosts, setAllPosts] = useState<SearchPost[]>([]);
-  const [allPages, setAllPages] = useState<SearchPage[]>([]);
-  const [allPlaces, setAllPlaces] = useState<SearchPlace[]>([]);
+  const [posts, setPosts] = useState<
+    SearchPost[]
+  >([]);
 
-  const [loading, setLoading] = useState(false);
-  const [searchLoaded, setSearchLoaded] = useState(false);
-  const [lastSavedQuery, setLastSavedQuery] = useState("");
-  const [randomSeed, setRandomSeed] = useState(0);
+  const [pages, setPages] = useState<
+    SearchPage[]
+  >([]);
+
+  const [places, setPlaces] = useState<
+    SearchPlace[]
+  >([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [searchLoaded, setSearchLoaded] =
+    useState(false);
+
+  const [
+    lastSavedQuery,
+    setLastSavedQuery,
+  ] = useState("");
+
+  const [randomSeed, setRandomSeed] =
+    useState(0);
 
   useEffect(() => {
     function checkMobile() {
@@ -354,27 +391,44 @@ export default function QuickActionBar() {
     }
 
     checkMobile();
-    window.addEventListener("resize", checkMobile);
+
+    window.addEventListener(
+      "resize",
+      checkMobile,
+    );
 
     return () =>
-      window.removeEventListener("resize", checkMobile);
+      window.removeEventListener(
+        "resize",
+        checkMobile,
+      );
   }, []);
 
   useEffect(() => {
     if (!searchOpen) return;
 
-    const previousOverflow = document.body.style.overflow;
-    const previousPosition = document.body.style.position;
-    const previousWidth = document.body.style.width;
+    const previousOverflow =
+      document.body.style.overflow;
+
+    const previousPosition =
+      document.body.style.position;
+
+    const previousWidth =
+      document.body.style.width;
 
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
     document.body.style.width = "100%";
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.position = previousPosition;
-      document.body.style.width = previousWidth;
+      document.body.style.overflow =
+        previousOverflow;
+
+      document.body.style.position =
+        previousPosition;
+
+      document.body.style.width =
+        previousWidth;
     };
   }, [searchOpen]);
 
@@ -406,61 +460,61 @@ export default function QuickActionBar() {
     async function loadSearchData() {
       setLoading(true);
 
-      const [pageResult, postResult, placeResult] =
-        await Promise.all([
-          supabase
-            .from("groups")
-            .select("*")
-            .eq("status", "approved")
-            .limit(500),
+      const [
+        pageResult,
+        postResult,
+        placeResult,
+      ] = await Promise.all([
+        supabase
+          .from("groups")
+          .select("*")
+          .eq("status", "approved")
+          .limit(500),
 
-          supabase
-            .from("posts")
-            .select(`
-              *,
-              groups(*)
-            `)
-            .limit(750),
+        supabase
+          .from("posts")
+          .select(`
+            *,
+            groups(*)
+          `)
+          .limit(750),
 
-          supabase
-            .from("places")
-            .select(`
-              *,
-              groups:page_id(*)
-            `)
-            .limit(500),
-        ]);
+        supabase
+          .from("places")
+          .select("*")
+          .limit(500),
+      ]);
 
       if (pageResult.error) {
         console.error(
-          "Page search loading error:",
+          "Page search error:",
           pageResult.error.message,
         );
       }
 
       if (postResult.error) {
         console.error(
-          "Post search loading error:",
+          "Post search error:",
           postResult.error.message,
         );
       }
 
       if (placeResult.error) {
         console.error(
-          "Place search loading error:",
+          "Place search error:",
           placeResult.error.message,
         );
       }
 
-      setAllPages(
+      setPages(
         (pageResult.data ?? []) as SearchPage[],
       );
 
-      setAllPosts(
+      setPosts(
         (postResult.data ?? []) as SearchPost[],
       );
 
-      setAllPlaces(
+      setPlaces(
         (placeResult.data ?? []) as SearchPlace[],
       );
 
@@ -474,22 +528,39 @@ export default function QuickActionBar() {
   useEffect(() => {
     const cleaned = query.trim();
 
-    if (!searchOpen || cleaned.length <= 3) return;
-    if (cleaned === lastSavedQuery) return;
+    if (!searchOpen || cleaned.length <= 3) {
+      return;
+    }
 
-    const timeout = window.setTimeout(async () => {
-      await supabase.from("suggestions").insert({
-        suggestion: cleaned,
-      });
+    if (cleaned === lastSavedQuery) {
+      return;
+    }
 
-      setLastSavedQuery(cleaned);
-    }, 1200);
+    const timeout = window.setTimeout(
+      async () => {
+        await supabase
+          .from("suggestions")
+          .insert({
+            suggestion: cleaned,
+          });
 
-    return () => window.clearTimeout(timeout);
-  }, [query, searchOpen, lastSavedQuery]);
+        setLastSavedQuery(cleaned);
+      },
+      1200,
+    );
+
+    return () =>
+      window.clearTimeout(timeout);
+  }, [
+    query,
+    searchOpen,
+    lastSavedQuery,
+  ]);
 
   useEffect(() => {
-    setRandomSeed((current) => current + 1);
+    if (query.trim().length >= 2) {
+      setRandomSeed((current) => current + 1);
+    }
   }, [query]);
 
   const actions = [
@@ -526,120 +597,173 @@ export default function QuickActionBar() {
     },
   ];
 
-  const results = useMemo<SearchResult[]>(() => {
+  const results = useMemo<
+    SearchResult[]
+  >(() => {
     const cleanedQuery = query.trim();
 
     if (cleanedQuery.length < 2) {
       return [];
     }
 
+    const pageMap = new Map(
+      pages.map((page) => [
+        String(page.id),
+        page,
+      ]),
+    );
+
     const pageIdsWithPlaces = new Set(
-      allPlaces
+      places
         .map((place) =>
           String(
             place.page_id ??
-              getSingleRelation(place.groups)?.id ??
+              place.group_id ??
+              place.owner_page_id ??
               "",
           ),
         )
         .filter(Boolean),
     );
 
-    const matchingPages = allPages.filter((page) => {
-      if (pageIdsWithPlaces.has(String(page.id))) {
-        return false;
-      }
+    const matchingPages = pages.filter(
+      (page) => {
+        if (
+          pageIdsWithPlaces.has(
+            String(page.id),
+          )
+        ) {
+          return false;
+        }
 
-      return matchesSearch(cleanedQuery, [
-        page.name,
-        page.slug,
-        page.description,
-        page.page_type,
-        page.category,
-        page.location,
-      ]);
-    });
-
-    const matchingPlaces = allPlaces.filter((place) => {
-      if (
-        place.is_active === false ||
-        place.active === false ||
-        place.status === "inactive"
-      ) {
-        return false;
-      }
-
-      const group = getSingleRelation(place.groups);
-
-      return matchesSearch(cleanedQuery, [
-        place.title,
-        place.name,
-        place.description,
-        place.location_name,
-        place.address,
-        place.postcode,
-        place.tags,
-        place.category,
-        group?.name,
-        group?.slug,
-        group?.description,
-      ]);
-    });
-
-    const matchingPosts = allPosts.filter((post) => {
-      if (isPostExpired(post)) {
-        return false;
-      }
-
-      const group = getSingleRelation(post.groups);
-
-      return matchesSearch(cleanedQuery, [
-        post.title,
-        post.content,
-        post.description,
-        post.type,
-        post.metadata?.public_type,
-        group?.name,
-        group?.slug,
-      ]);
-    });
-
-    const alerts: SearchResult[] = matchingPosts
-      .filter(isAlert)
-      .map((post) => ({
-        kind: "alert",
-        post,
-        random: Math.random(),
-      }));
-
-    const places: SearchResult[] = matchingPlaces.map(
-      (place) => ({
-        kind: "place",
-        place,
-        random: Math.random(),
-      }),
+        return matchesSearch(
+          cleanedQuery,
+          [
+            page.name,
+            page.slug,
+            page.description,
+            page.page_type,
+            page.category,
+            page.location,
+            page.town,
+          ],
+        );
+      },
     );
 
-    const posts: SearchResult[] = matchingPosts
-      .filter((post) => !isAlert(post))
-      .map((post) => ({
-        kind: "post",
-        post,
-        random: Math.random(),
-      }));
+    const matchingPlaces = places.filter(
+      (place) => {
+        if (
+          place.is_active === false ||
+          place.active === false ||
+          place.status === "inactive"
+        ) {
+          return false;
+        }
 
-    const pages: SearchResult[] = matchingPages.map(
-      (page) => ({
+        const pageId =
+          place.page_id ??
+          place.group_id ??
+          place.owner_page_id;
+
+        const page = pageId
+          ? pageMap.get(String(pageId))
+          : undefined;
+
+        return matchesSearch(
+          cleanedQuery,
+          [
+            place.title,
+            place.name,
+            place.description,
+            place.location_name,
+            place.address,
+            place.postcode,
+            place.tags,
+            place.category,
+            place.town,
+            page?.name,
+            page?.slug,
+            page?.description,
+          ],
+        );
+      },
+    );
+
+    const matchingPosts = posts.filter(
+      (post) => {
+        if (isPostExpired(post)) {
+          return false;
+        }
+
+        const group = getPostGroup(post);
+
+        return matchesSearch(
+          cleanedQuery,
+          [
+            post.title,
+            post.content,
+            post.description,
+            post.type,
+            post.metadata?.public_type,
+            group?.name,
+            group?.slug,
+          ],
+        );
+      },
+    );
+
+    const alerts: SearchResult[] =
+      matchingPosts
+        .filter(isAlert)
+        .map((post) => ({
+          kind: "alert",
+          post,
+          random: Math.random(),
+        }));
+
+    const placeResults: SearchResult[] =
+      matchingPlaces.map((place) => {
+        const pageId =
+          place.page_id ??
+          place.group_id ??
+          place.owner_page_id;
+
+        return {
+          kind: "place",
+          place,
+          page: pageId
+            ? pageMap.get(String(pageId))
+            : undefined,
+          random: Math.random(),
+        };
+      });
+
+    const postResults: SearchResult[] =
+      matchingPosts
+        .filter((post) => !isAlert(post))
+        .map((post) => ({
+          kind: "post",
+          post,
+          random: Math.random(),
+        }));
+
+    const pageResults: SearchResult[] =
+      matchingPages.map((page) => ({
         kind: "page",
         page,
         random: Math.random(),
-      }),
-    );
+      }));
 
-    function sortSection(section: SearchResult[]) {
+    function sortSection(
+      section: SearchResult[],
+    ) {
       return [...section].sort((a, b) => {
-        const aPartner = resultIsLocalPartner(a);
-        const bPartner = resultIsLocalPartner(b);
+        const aPartner =
+          resultIsLocalPartner(a);
+
+        const bPartner =
+          resultIsLocalPartner(b);
 
         if (aPartner !== bPartner) {
           return aPartner ? -1 : 1;
@@ -651,14 +775,14 @@ export default function QuickActionBar() {
 
     return [
       ...sortSection(alerts),
-      ...sortSection(places),
-      ...sortSection(posts),
-      ...sortSection(pages),
+      ...sortSection(placeResults),
+      ...sortSection(postResults),
+      ...sortSection(pageResults),
     ];
   }, [
-    allPages,
-    allPlaces,
-    allPosts,
+    pages,
+    posts,
+    places,
     query,
     randomSeed,
   ]);
@@ -686,10 +810,15 @@ export default function QuickActionBar() {
                 key={label}
                 type="button"
                 aria-label={label}
-                onClick={() => setSearchOpen(true)}
+                onClick={() =>
+                  setSearchOpen(true)
+                }
                 className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-neutral-100"
               >
-                <Icon size={22} className="text-black" />
+                <Icon
+                  size={22}
+                  className="text-black"
+                />
               </button>
             ) : (
               <Link
@@ -702,7 +831,10 @@ export default function QuickActionBar() {
                     : "hover:bg-neutral-100"
                 }`}
               >
-                <Icon size={22} className="text-black" />
+                <Icon
+                  size={22}
+                  className="text-black"
+                />
               </Link>
             ),
         )}
@@ -750,8 +882,8 @@ export default function QuickActionBar() {
                 </h2>
 
                 <p className="mt-3 text-sm text-white/80">
-                  Search places, alerts, events, deals and
-                  pages.
+                  Search places, alerts, events,
+                  deals and pages.
                 </p>
               </div>
             ) : loading ? (
@@ -761,14 +893,18 @@ export default function QuickActionBar() {
             ) : results.length > 0 ? (
               <div className="space-y-2">
                 {results.map((result) => {
-                  if (result.kind === "page") {
-                    const page = result.page;
-                    const partner = isLocalPartner(page);
+                  if (
+                    result.kind === "page"
+                  ) {
+                    const partner =
+                      isLocalPartner(
+                        result.page,
+                      );
 
                     return (
                       <Link
-                        key={`page-${page.id}`}
-                        href={`/${page.slug}`}
+                        key={`page-${result.page.id}`}
+                        href={`/${result.page.slug}`}
                         onClick={closeSearch}
                         className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
                       >
@@ -779,14 +915,16 @@ export default function QuickActionBar() {
 
                           <div className="min-w-0">
                             <p className="truncate font-bold text-black">
-                              {page.name}
+                              {result.page.name}
                             </p>
 
                             <p className="truncate text-xs text-neutral-500">
                               {partner
                                 ? "Local Partner · "
                                 : ""}
-                              {page.page_type ?? "Page"}
+
+                              {result.page.page_type ??
+                                "Page"}
                             </p>
                           </div>
                         </div>
@@ -799,19 +937,24 @@ export default function QuickActionBar() {
                     );
                   }
 
-                  if (result.kind === "place") {
-                    const place = result.place;
-                    const group = getSingleRelation(
-                      place.groups,
-                    );
-
+                  if (
+                    result.kind === "place"
+                  ) {
                     const partner =
-                      isLocalPartner(group);
+                      isLocalPartner(
+                        result.page,
+                      ) ||
+                      isLocalPartner(
+                        result.place,
+                      );
 
                     return (
                       <Link
-                        key={`place-${place.id}`}
-                        href={getPlaceHref(place)}
+                        key={`place-${result.place.id}`}
+                        href={getPlaceHref(
+                          result.place,
+                          result.page,
+                        )}
                         onClick={closeSearch}
                         className="flex items-center justify-between rounded-3xl bg-neutral-50 p-4"
                       >
@@ -822,17 +965,21 @@ export default function QuickActionBar() {
 
                           <div className="min-w-0">
                             <p className="truncate font-bold text-black">
-                              {getPlaceName(place)}
+                              {getPlaceName(
+                                result.place,
+                                result.page,
+                              )}
                             </p>
 
                             <p className="truncate text-xs text-neutral-500">
                               {partner
                                 ? "Local Partner · "
                                 : ""}
-                              {place.location_name ??
-                                place.address ??
-                                group?.name ??
-                                "Place"}
+
+                              {getPlaceDescription(
+                                result.place,
+                                result.page,
+                              )}
                             </p>
                           </div>
                         </div>
@@ -846,11 +993,19 @@ export default function QuickActionBar() {
                   }
 
                   const post = result.post;
-                  const group = getSingleRelation(post.groups);
-                  const partner = isLocalPartner(group);
-                  const alert = result.kind === "alert";
+                  const group =
+                    getPostGroup(post);
+
+                  const partner =
+                    isLocalPartner(group);
+
+                  const alert =
+                    result.kind === "alert";
+
                   const deal = isDeal(post);
-                  const date = formatPostDate(post);
+
+                  const date =
+                    formatPostDate(post);
 
                   return (
                     <Link
@@ -870,11 +1025,15 @@ export default function QuickActionBar() {
                           }`}
                         >
                           {alert ? (
-                            <AlertTriangle size={20} />
+                            <AlertTriangle
+                              size={20}
+                            />
                           ) : deal ? (
                             <Tag size={20} />
                           ) : (
-                            <CalendarDays size={20} />
+                            <CalendarDays
+                              size={20}
+                            />
                           )}
                         </div>
 
@@ -887,7 +1046,10 @@ export default function QuickActionBar() {
                             {partner
                               ? "Local Partner · "
                               : ""}
-                            {group?.name ?? "East Lothian"}
+
+                            {group?.name ??
+                              "East Lothian"}
+
                             {!alert && date
                               ? ` · ${date}`
                               : ""}
@@ -910,8 +1072,8 @@ export default function QuickActionBar() {
                 </p>
 
                 <p className="mt-2 text-sm text-neutral-500">
-                  We’ll use searches like this to learn what
-                  East Lothian wants.
+                  We’ll use searches like this to
+                  learn what East Lothian wants.
                 </p>
               </div>
             )}
