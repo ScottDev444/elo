@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Check,
-  ChevronDown,
   LoaderCircle,
   UserRound,
 } from "lucide-react";
@@ -17,7 +15,6 @@ type UserRow = {
 };
 
 export default function SiteHeader() {
-  const [locationOpen, setLocationOpen] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -83,7 +80,7 @@ export default function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
-      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
           className="flex items-center gap-3"
@@ -107,61 +104,6 @@ export default function SiteHeader() {
             </p>
           </div>
         </Link>
-
-        <div className="absolute left-1/2 -translate-x-1/2">
-          <button
-            type="button"
-            onClick={() => setLocationOpen((open) => !open)}
-            aria-expanded={locationOpen}
-            aria-haspopup="menu"
-            className="flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-slate-700 transition hover:text-slate-950"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-70" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-
-            <span>Connected to East Lothian</span>
-
-            <ChevronDown
-              className={`h-4 w-4 text-slate-500 transition-transform ${
-                locationOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {locationOpen && (
-            <div
-              role="menu"
-              className="absolute left-1/2 top-full mt-3 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => setLocationOpen(false)}
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    East Lothian
-                  </p>
-
-                  <p className="text-xs text-slate-500">
-                    Your current community
-                  </p>
-                </div>
-
-                <Check className="h-4 w-4 text-emerald-600" />
-              </button>
-
-              <div className="mt-1 border-t border-slate-100 px-3 py-2.5">
-                <p className="text-xs font-medium text-slate-500">
-                  More communities coming soon 👀
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
 
         {authLoading ? (
           <div className="flex h-10 min-w-24 items-center justify-center">
