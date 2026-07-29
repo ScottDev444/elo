@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "motion/react";
 import {
   CalendarDays,
   MapPin,
@@ -30,7 +29,7 @@ const quickActions = [
   {
     label: "Profile",
     icon: UserRound,
-    href: "/profile",
+    href: "/account",
   },
 ];
 
@@ -38,26 +37,11 @@ export default function HomeHero() {
   return (
     <section className="relative isolate w-full min-w-0 bg-emerald-700">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <motion.svg
+        <svg
           className="absolute inset-0 h-full w-full opacity-35"
           viewBox="0 0 1440 800"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
-          initial={{
-            scale: 1.04,
-            x: 0,
-            y: 0,
-          }}
-          animate={{
-            scale: [1.04, 1.07, 1.04],
-            x: [0, -10, 0],
-            y: [0, -6, 0],
-          }}
-          transition={{
-            duration: 40,
-            ease: "easeInOut",
-            repeat: Infinity,
-          }}
         >
           <polygon points="0,0 260,0 150,210" fill="#10b981" />
           <polygon points="260,0 500,0 370,190 150,210" fill="#059669" />
@@ -92,80 +76,22 @@ export default function HomeHero() {
             <polyline points="0,360 260,410 510,430 780,440 1050,420 1440,430" />
             <polyline points="0,570 120,620 390,650 650,670 920,650 1260,640 1440,430" />
           </g>
-        </motion.svg>
+        </svg>
 
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/10 via-emerald-700/20 to-emerald-900/30" />
-
-        <motion.div
-          className="absolute -left-[40%] top-0 h-full w-[35%] skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/10 to-transparent blur-2xl"
-          animate={{
-            x: ["0%", "450%"],
-          }}
-          transition={{
-            duration: 3,
-            delay: 5,
-            repeat: Infinity,
-            repeatDelay: 14,
-            ease: "easeInOut",
-          }}
-        />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-[72vh] w-full max-w-6xl min-w-0 items-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <div className="w-full min-w-0 text-center">
-          <motion.h1
-            className="mx-auto max-w-5xl text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl"
-            initial={{
-              opacity: 0,
-              y: 22,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              duration: 0.65,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
+          <h1 className="mx-auto max-w-5xl text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
             East Lothian Online
-          </motion.h1>
+          </h1>
 
-          <motion.div
-            className="relative z-50 mx-auto mt-8 w-full min-w-0 max-w-2xl sm:mt-10"
-            initial={{
-              opacity: 0,
-              y: 16,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              duration: 0.55,
-              delay: 0.15,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
+          <div className="relative z-50 mx-auto mt-8 w-full min-w-0 max-w-2xl sm:mt-10">
             <HomeSearch />
-          </motion.div>
+          </div>
 
-          <motion.div
-            className="relative z-10 mx-auto mt-7 flex w-full min-w-0 flex-wrap items-start justify-center gap-3 sm:gap-6"
-            initial={{
-              opacity: 0,
-              y: 10,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              duration: 0.5,
-              delay: 0.3,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
+          <div className="relative z-10 mx-auto mt-7 flex w-full min-w-0 flex-wrap items-start justify-center gap-3 sm:gap-6">
             {quickActions.map((action) => {
               const Icon = action.icon;
 
@@ -186,7 +112,7 @@ export default function HomeHero() {
                 </Link>
               );
             })}
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

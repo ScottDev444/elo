@@ -1,22 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
   Building2,
-  ChevronRight,
-  Clock3,
+  Compass,
   LoaderCircle,
   MapPin,
   Search,
-  Store,
+  Sparkles,
   X,
 } from "lucide-react";
 
 import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
+import PlacePost from "@/components/PlacePost";
 import { createClient } from "@/lib/supabase/client";
 
 type OpeningDay = {
@@ -47,6 +46,7 @@ type PlaceMetadata = {
   village?: string | null;
   category?: string | null;
   public_type?: string | null;
+  is_local_partner?: boolean | null;
 };
 
 type DatabasePlace = {
@@ -56,15 +56,19 @@ type DatabasePlace = {
   slug?: string | null;
   description?: string | null;
   image_url?: string | null;
+  images?: string[] | null;
   address?: string | null;
+  postcode?: string | null;
   location?: string | null;
   town?: string | null;
   community?: string | null;
   category?: string | null;
+  tags?: string[] | null;
   opening_hours?: OpeningHours | null;
   metadata?: PlaceMetadata | null;
   approved?: boolean | null;
   active?: boolean | null;
+  is_local_partner?: boolean | null;
 };
 
 type Place = {
@@ -73,11 +77,15 @@ type Place = {
   description: string | null;
   href: string;
   imageUrl: string | null;
+  images: string[];
   address: string | null;
+  postcode: string | null;
   community: string;
   category: string | null;
+  tags: string[];
   openingHours: OpeningHours | null;
   open24Seven: boolean;
+  isLocalPartner: boolean;
 };
 
 const communities = [
@@ -123,28 +131,42 @@ const communityDescriptions: Record<string, string> = {
     "A coastal village shaped by its bay, nature reserve and welcoming local stops.",
   Athelstaneford:
     "A small rural community surrounded by open countryside and local history.",
+  Auldhame:
+    "A tiny coastal settlement near Seacliff, surrounded by farmland, beaches and historic landmarks.",
   Belhaven:
     "A coastal community beside Dunbar, known for its beach, bridge and relaxed pace.",
+  Bolton:
+    "A small rural village near Haddington, surrounded by farmland and quiet country roads.",
   Cockenzie:
     "A historic harbour community with a strong local identity and coastal character.",
   Dirleton:
     "A picturesque village with historic streets, gardens and places worth slowing down for.",
+  Drem:
+    "A rural village and railway stop connecting the surrounding countryside with the coast.",
   Dunbar:
     "A lively coastal town full of history, independent businesses and dramatic sea views.",
   "East Linton":
     "A riverside community with independent shops, historic buildings and countryside nearby.",
+  "East Saltoun":
+    "A peaceful village near the Lammermuirs, surrounded by woodland, farmland and local history.",
   Elphinstone:
     "A close-knit village between Tranent and the surrounding East Lothian countryside.",
   Garvald:
     "A peaceful rural village tucked into the Lammermuir foothills.",
   Gifford:
     "A handsome village centred around its square, local businesses and countryside walks.",
+  Gladsmuir:
+    "A rural village between Tranent and Haddington with open countryside and a strong local community.",
   Gullane:
     "A coastal community known for its beach, golf, food and wide-open views.",
   Haddington:
     "East Lothian's historic county town, filled with local shops, food and community life.",
   Humbie:
     "A scattered rural community surrounded by farmland, woodland and quiet roads.",
+  Innerwick:
+    "A historic village east of Dunbar, set between the coast and the Lammermuir Hills.",
+  Kingston:
+    "A small rural settlement near North Berwick, surrounded by farmland and open East Lothian countryside.",
   Longniddry:
     "A coastal village with local shops, green spaces and easy access to the shore.",
   Macmerry:
@@ -161,15 +183,43 @@ const communityDescriptions: Record<string, string> = {
     "A harbour community with fishing roots, coastal views and a lively local scene.",
   Prestonpans:
     "A historic coastal town shaped by industry, art, community and the sea.",
+  Stenton:
+    "A beautifully preserved village near Dunbar, known for its stone buildings and peaceful rural setting.",
   Tranent:
     "A busy local town with deep history and a growing mix of shops and services.",
   Wallyford:
     "A fast-growing community connecting East Lothian with Edinburgh and the coast.",
   "West Barns":
     "A village beside Dunbar with local character, open countryside and easy coastal access.",
+  "West Saltoun":
+    "A small rural settlement near East Saltoun, surrounded by woodland and farmland.",
   Whitecraig:
     "A compact community beside Dalkeith Country Park and the western edge of East Lothian.",
+  Whitekirk:
+    "A historic rural village near the coast, surrounded by farmland and centuries of local heritage.",
 };
+
+function normaliseCommunityText(value?: string | null) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function placeMatchesCommunity(place: Place, community: string) {
+  const keyword = normaliseCommunityText(community);
+
+  if (!keyword) {
+    return true;
+  }
+
+  return [
+    place.community,
+    place.address,
+    place.description,
+  ].some((value) => normaliseCommunityText(value).includes(keyword));
+}
 
 const dayNames = [
   "sunday",
@@ -197,10 +247,17 @@ function getCommunity(place: DatabasePlace) {
 }
 
 function acceptsWalkIns(place: DatabasePlace) {
-  return (
-    place.metadata?.accepts_walk_ins === true ||
-    place.metadata?.walk_ins === true
-  );
+  const acceptsWalkInsValue = place.metadata?.accepts_walk_ins;
+  const walkInsValue = place.metadata?.walk_ins;
+
+  // Only hide a place when it has been explicitly marked as
+  // not accepting walk-ins. Older listings may not have either
+  // metadata field yet, so they should still remain visible.
+  if (acceptsWalkInsValue === false || walkInsValue === false) {
+    return false;
+  }
+
+  return true;
 }
 
 function mapPlace(place: DatabasePlace): Place {
@@ -212,15 +269,42 @@ function mapPlace(place: DatabasePlace): Place {
     description: place.description?.trim() || null,
     href: place.slug ? `/places/${place.slug}` : `/places/${place.id}`,
     imageUrl: place.image_url || null,
+    images: Array.from(
+      new Set(
+        [
+          ...(Array.isArray(place.images) ? place.images : []),
+          place.image_url,
+        ].filter(
+          (image): image is string =>
+            typeof image === "string" && image.trim().length > 0,
+        ),
+      ),
+    ),
     address: place.address?.trim() || place.location?.trim() || null,
+    postcode: place.postcode?.trim() || null,
     community: getCommunity(place),
     category:
       place.category?.trim() ||
       place.metadata?.category?.trim() ||
       place.metadata?.public_type?.trim() ||
       null,
+    tags: Array.from(
+      new Set(
+        [
+          ...(Array.isArray(place.tags) ? place.tags : []),
+          place.category?.trim(),
+          place.metadata?.category?.trim(),
+        ].filter(
+          (tag): tag is string =>
+            typeof tag === "string" && tag.trim().length > 0,
+        ),
+      ),
+    ),
     openingHours: place.opening_hours ?? null,
     open24Seven: place.metadata?.open_24_7 === true,
+    isLocalPartner:
+      place.is_local_partner === true ||
+      place.metadata?.is_local_partner === true,
   };
 }
 
@@ -278,78 +362,29 @@ function getTodayHours(place: Place, now: Date) {
   return `${today.open}–${today.close}`;
 }
 
-function PlaceCard({
-  place,
-  now,
-}: {
-  place: Place;
-  now: Date;
-}) {
-  const open = isPlaceOpen(place, now);
+function normaliseOpeningHours(
+  openingHours: OpeningHours | null,
+): Record<
+  string,
+  {
+    open?: string;
+    close?: string;
+    closed?: boolean;
+  }
+> | null {
+  if (!openingHours) {
+    return null;
+  }
 
-  return (
-    <Link
-      href={place.href}
-      className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg"
-    >
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-        {place.imageUrl ? (
-          <Image
-            src={place.imageUrl}
-            alt=""
-            fill
-            className="object-cover transition duration-500 group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="grid h-full place-items-center">
-            <Store className="h-10 w-10 text-slate-300" />
-          </div>
-        )}
-
-        <div
-          className={`absolute left-3 top-3 rounded-lg px-3 py-1.5 text-xs font-black shadow-sm ${
-            open
-              ? "bg-emerald-700 text-white"
-              : "bg-white text-slate-700"
-          }`}
-        >
-          {open ? "Open now" : "Closed"}
-        </div>
-      </div>
-
-      <div className="p-4 sm:p-5">
-        {place.category ? (
-          <p className="text-xs font-black uppercase tracking-wider text-emerald-700">
-            {place.category}
-          </p>
-        ) : null}
-
-        <div className="mt-1 flex items-start justify-between gap-4">
-          <h3 className="text-xl font-black leading-tight">{place.name}</h3>
-          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-slate-900" />
-        </div>
-
-        <div className="mt-3 space-y-2 text-sm font-medium text-slate-600">
-          <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              {place.address
-                ? `${place.address}, ${place.community}`
-                : place.community}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Clock3 className="h-4 w-4 shrink-0" />
-            <span>{getTodayHours(place, now)}</span>
-          </div>
-        </div>
-      </div>
-    </Link>
+  return Object.fromEntries(
+    Object.entries(openingHours).map(([day, value]) => [
+      day,
+      {
+        open: value?.open ?? undefined,
+        close: value?.close ?? undefined,
+        closed: value?.closed ?? undefined,
+      },
+    ]),
   );
 }
 
@@ -401,7 +436,13 @@ export default function PlacesPage() {
         .filter((place) => place.approved !== false)
         .filter((place) => place.active !== false)
         .map(mapPlace)
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => {
+          if (a.isLocalPartner !== b.isLocalPartner) {
+            return a.isLocalPartner ? -1 : 1;
+          }
+
+          return a.name.localeCompare(b.name);
+        });
 
       setPlaces(mapped);
       setLoading(false);
@@ -423,18 +464,26 @@ export default function PlacesPage() {
     return communities[dayOfYear % communities.length];
   }, [now]);
 
+  const allCommunities = useMemo(() => {
+    const databaseCommunities = places
+      .map((place) => place.community.trim())
+      .filter(
+        (community) =>
+          community.length > 0 &&
+          normaliseCommunityText(community) !== "east lothian",
+      );
+
+    return Array.from(new Set([...communities, ...databaseCommunities])).sort(
+      (a, b) => a.localeCompare(b),
+    );
+  }, [places]);
+
   const communityPlaces = useMemo(
     () =>
-      places.filter(
-        (place) =>
-          place.community.toLowerCase() === communityOfTheDay.toLowerCase()
+      places.filter((place) =>
+        placeMatchesCommunity(place, communityOfTheDay),
       ),
-    [communityOfTheDay, places]
-  );
-
-  const openNowPlaces = useMemo(
-    () => places.filter((place) => isPlaceOpen(place, now)),
-    [now, places]
+    [communityOfTheDay, places],
   );
 
   const filteredPlaces = useMemo(() => {
@@ -443,7 +492,7 @@ export default function PlacesPage() {
     return places.filter((place) => {
       if (
         selectedCommunity &&
-        place.community.toLowerCase() !== selectedCommunity.toLowerCase()
+        !placeMatchesCommunity(place, selectedCommunity)
       ) {
         return false;
       }
@@ -471,295 +520,339 @@ export default function PlacesPage() {
   }, [now, places, query, selectedCommunity, showOpenNow]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="min-h-screen bg-[#f6f7f8] text-slate-950">
       <SiteHeader />
 
       <main>
-        <section className="border-b border-emerald-800 bg-emerald-700 text-white">
-          <div className="px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-            <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-100">
-                  Atlas Places
-                </p>
+        <section className="relative overflow-hidden bg-[#072d22] text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.22),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.08),transparent_28%)]" />
 
-                <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
-                  Discover somewhere worth visiting.
-                </h1>
+          <div className="relative px-4 pb-10 pt-12 sm:px-6 lg:px-8 lg:pb-14 lg:pt-16">
+            <div className="mx-auto max-w-7xl">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
+                <div>
+                  <div className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-emerald-300">
+                    <Compass className="h-4 w-4" />
+                    East Lothian Places
+                  </div>
 
-                <p className="mt-4 max-w-2xl text-base leading-7 text-emerald-50 sm:text-lg">
-                  Explore physical places across every East Lothian community,
-                  from the largest towns to the smallest villages.
-                </p>
+                  <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-[-0.04em] sm:text-6xl lg:text-7xl">
+                    Find somewhere local worth stepping into.
+                  </h1>
+
+                  <p className="mt-5 max-w-2xl text-base leading-8 text-emerald-50/80 sm:text-lg">
+                    Shops, cafés, venues and useful local places across every
+                    corner of East Lothian.
+                  </p>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/8 p-5 backdrop-blur">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
+                    On the map now
+                  </p>
+
+                  <div className="mt-3 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-4xl font-black">{places.length}</p>
+                      <p className="mt-1 text-sm text-white/65">
+                        walk-in places listed
+                      </p>
+                    </div>
+
+                    <Link
+                      href="/create"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-emerald-950 transition hover:bg-emerald-100"
+                    >
+                      Add yours
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
               </div>
 
-              <Link
-                href="/create"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 font-black text-emerald-800 transition hover:bg-emerald-50"
-              >
-                Add a place
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-            </div>
+              <div className="mt-10 grid gap-3 lg:grid-cols-[1fr_auto]">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
 
-            <div className="mt-8 grid gap-3 lg:grid-cols-[1fr_auto]">
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-900/50" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search a place, community or category"
+                    className="h-16 w-full rounded-2xl border border-white/10 bg-white pl-14 pr-14 text-base font-semibold text-slate-950 shadow-2xl shadow-black/15 outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-300/20"
+                  />
 
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search places, communities or categories"
-                  className="h-14 w-full rounded-xl border border-white/30 bg-white pl-12 pr-12 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-white"
-                />
+                  {query ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-950"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  ) : null}
+                </label>
 
-                {query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-950"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                ) : null}
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setShowOpenNow((current) => !current)}
-                className={`h-14 rounded-xl border px-6 font-black transition ${
-                  showOpenNow
-                    ? "border-white bg-white text-emerald-800"
-                    : "border-white/40 bg-emerald-800 text-white hover:bg-emerald-900"
-                }`}
-              >
-                {showOpenNow ? "Showing Open Now" : "Open Now"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOpenNow((current) => !current)}
+                  className={`h-16 rounded-2xl border px-7 font-black transition ${
+                    showOpenNow
+                      ? "border-emerald-300 bg-emerald-300 text-emerald-950"
+                      : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                  }`}
+                >
+                  {showOpenNow ? "Showing open now" : "Open now"}
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="border-b border-slate-200 bg-white px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-white shadow-sm">
-            <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="p-6 sm:p-8 lg:p-10">
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-400">
-                  Community of the Day
-                </p>
-
-                <h2 className="mt-3 text-4xl font-black sm:text-5xl">
-                  {communityOfTheDay}
-                </h2>
-
-                <p className="mt-4 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-                  {communityDescriptions[communityOfTheDay] ??
-                    `Discover ${communityOfTheDay}, one of East Lothian's many unique local communities.`}
-                </p>
-
-                {communityPlaces.length > 0 ? (
-                  <p className="mt-4 font-bold text-emerald-300">
-                    {communityPlaces.length}{" "}
-                    {communityPlaces.length === 1 ? "place" : "places"} to
-                    discover
-                  </p>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCommunity(communityOfTheDay);
-                    setShowOpenNow(false);
-                    document
-                      .getElementById("all-places")
-                      ?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className="mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-black text-white transition hover:bg-emerald-500"
-                >
-                  Explore {communityOfTheDay}
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="relative min-h-64 overflow-hidden bg-emerald-700">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.24),transparent_45%)]" />
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="text-center">
-                    <MapPin className="mx-auto h-16 w-16 text-white/90" />
-                    <p className="mt-4 text-2xl font-black">
+        {!query.trim() ? (
+          <>
+          <section className="border-b border-slate-200 bg-[#edf7f2] px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+            <div className="mx-auto max-w-7xl">
+              <div className="overflow-hidden rounded-[2rem] bg-[#0b3d2e] text-white shadow-xl shadow-emerald-950/10">
+                <div className="grid lg:grid-cols-[minmax(0,1fr)_24rem]">
+                  <div className="p-7 sm:p-10 lg:p-12">
+                    <div className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-emerald-300">
+                      <Sparkles className="h-4 w-4" />
+                      Community of the day
+                    </div>
+  
+                    <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">
                       {communityOfTheDay}
+                    </h2>
+  
+                    <p className="mt-5 max-w-2xl text-base leading-8 text-white/70 sm:text-lg">
+                      {communityDescriptions[communityOfTheDay] ??
+                        `Discover ${communityOfTheDay}, one of East Lothian's many unique local communities.`}
                     </p>
-                    <p className="mt-1 text-sm font-bold uppercase tracking-[0.2em] text-emerald-100">
-                      East Lothian
-                    </p>
+  
+                    <div className="mt-7 flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCommunity(communityOfTheDay);
+                          setShowOpenNow(false);
+                          document
+                            .getElementById("all-places")
+                            ?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 font-black text-emerald-950 transition hover:bg-white"
+                      >
+                        Explore {communityOfTheDay}
+                        <ArrowRight className="h-5 w-5" />
+                      </button>
+  
+                      {communityPlaces.length > 0 ? (
+                        <span className="text-sm font-bold text-emerald-100/80">
+                          {communityPlaces.length}{" "}
+                          {communityPlaces.length === 1 ? "place" : "places"} listed
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+  
+                  <div className="relative min-h-72 overflow-hidden bg-emerald-700">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_42%)]" />
+                    <div className="absolute -bottom-20 -right-14 h-64 w-64 rounded-full border-[3rem] border-white/10" />
+                    <div className="absolute inset-0 grid place-items-center">
+                      <div className="text-center">
+                        <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-white/10 backdrop-blur">
+                          <MapPin className="h-12 w-12 text-white" />
+                        </div>
+                        <p className="mt-5 text-2xl font-black">
+                          {communityOfTheDay}
+                        </p>
+                        <p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+                          East Lothian
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        {openNowPlaces.length > 0 && !showOpenNow && !selectedCommunity ? (
-          <section className="border-b border-slate-200 bg-white px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                  Right now
-                </p>
-                <h2 className="mt-2 text-3xl font-black sm:text-4xl">
-                  Open Now
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowOpenNow(true)}
-                className="hidden items-center gap-2 font-black text-emerald-700 transition hover:text-emerald-900 sm:flex"
-              >
-                See all
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {openNowPlaces.slice(0, 4).map((place) => (
-                <PlaceCard key={place.id} place={place} now={now} />
-              ))}
-            </div>
           </section>
+          </>
         ) : null}
 
-        <section className="border-b border-slate-200 bg-slate-50 px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-              Every corner counts
-            </p>
-            <h2 className="mt-2 text-3xl font-black sm:text-4xl">
-              Browse Communities
-            </h2>
-            <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-              Big towns, coastal villages, rural communities and everywhere in
-              between.
-            </p>
-          </div>
-
-          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-            <button
-              type="button"
-              onClick={() => setSelectedCommunity(null)}
-              className={`min-h-20 rounded-xl border p-4 text-left font-black transition ${
-                selectedCommunity === null
-                  ? "border-emerald-700 bg-emerald-700 text-white"
-                  : "border-slate-200 bg-white hover:border-slate-400"
-              }`}
-            >
-              All communities
-            </button>
-
-            {communities.map((community) => {
-              const count = places.filter(
-                (place) =>
-                  place.community.toLowerCase() === community.toLowerCase()
-              ).length;
-              const selected = selectedCommunity === community;
-
-              return (
+        {!query.trim() ? (
+          <>
+          <section className="border-b border-slate-200 bg-white px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+            <div className="mx-auto max-w-7xl">
+              <div className="max-w-2xl">
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Choose an area
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                  Browse communities
+                </h2>
+                <p className="mt-3 leading-7 text-slate-600">
+                  From busy high streets to small villages, every community gets
+                  its own place on the map.
+                </p>
+              </div>
+  
+              <div className="mt-7 flex gap-3 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <button
-                  key={community}
                   type="button"
-                  onClick={() => setSelectedCommunity(community)}
-                  className={`min-h-20 rounded-xl border p-4 text-left transition ${
-                    selected
+                  onClick={() => setSelectedCommunity(null)}
+                  className={`shrink-0 rounded-full border px-5 py-3 text-sm font-black transition ${
+                    selectedCommunity === null
                       ? "border-emerald-700 bg-emerald-700 text-white"
-                      : "border-slate-200 bg-white hover:border-slate-400"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                   }`}
                 >
-                  <span className="block font-black">{community}</span>
-                  {count > 0 ? (
-                    <span
-                      className={`mt-1 block text-xs font-bold ${
-                        selected ? "text-emerald-100" : "text-slate-500"
+                  All communities
+                </button>
+  
+                {allCommunities.map((community) => {
+                  const count = places.filter((place) =>
+                    placeMatchesCommunity(place, community),
+                  ).length;
+                  const selected = selectedCommunity === community;
+  
+                  return (
+                    <button
+                      key={community}
+                      type="button"
+                      onClick={() => setSelectedCommunity(community)}
+                      className={`shrink-0 rounded-full border px-5 py-3 text-sm font-black transition ${
+                        selected
+                          ? "border-emerald-700 bg-emerald-700 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                       }`}
                     >
-                      {count} {count === 1 ? "place" : "places"}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                      {community}
+                      {count > 0 ? (
+                        <span
+                          className={`ml-2 ${
+                            selected ? "text-emerald-100" : "text-slate-400"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+          </>
+        ) : null}
 
         <section
           id="all-places"
-          className="bg-white px-4 py-10 sm:px-6 lg:px-8 lg:py-12"
+          className="bg-[#f6f7f8] px-4 py-10 sm:px-6 lg:px-8 lg:py-14"
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Explore
-              </p>
-
-              <h2 className="mt-2 text-3xl font-black sm:text-4xl">
-                {selectedCommunity
-                  ? `Places in ${selectedCommunity}`
-                  : showOpenNow
-                  ? "Places open now"
-                  : "All Places"}
-              </h2>
-            </div>
-
-            {selectedCommunity || showOpenNow || query ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCommunity(null);
-                  setShowOpenNow(false);
-                  setQuery("");
-                }}
-                className="inline-flex items-center gap-2 self-start font-black text-slate-600 transition hover:text-slate-950 sm:self-auto"
-              >
-                <X className="h-4 w-4" />
-                Clear filters
-              </button>
-            ) : null}
-          </div>
-
-          {loading ? (
-            <div className="grid min-h-80 place-items-center">
-              <div className="flex items-center gap-3 font-bold text-slate-600">
-                <LoaderCircle className="h-5 w-5 animate-spin" />
-                Loading places
-              </div>
-            </div>
-          ) : loadError ? (
-            <div className="grid min-h-80 place-items-center text-center">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <Building2 className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-4 text-lg font-black">{loadError}</p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Refresh the page and try again.
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Explore
+                </p>
+
+                <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                  {selectedCommunity
+                    ? `Places in ${selectedCommunity}`
+                    : showOpenNow
+                    ? "Places open now"
+                    : "All places"}
+                </h2>
+
+                {!loading && !loadError ? (
+                  <p className="mt-2 text-sm font-semibold text-slate-500">
+                    {filteredPlaces.length}{" "}
+                    {filteredPlaces.length === 1 ? "place" : "places"}
+                  </p>
+                ) : null}
+              </div>
+
+              {selectedCommunity || showOpenNow || query ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCommunity(null);
+                    setShowOpenNow(false);
+                    setQuery("");
+                  }}
+                  className="inline-flex items-center gap-2 self-start rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-slate-500 hover:text-slate-950 sm:self-auto"
+                >
+                  <X className="h-4 w-4" />
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+
+            {loading ? (
+              <div className="grid min-h-80 place-items-center">
+                <div className="flex items-center gap-3 font-bold text-slate-600">
+                  <LoaderCircle className="h-5 w-5 animate-spin" />
+                  Loading places
+                </div>
+              </div>
+            ) : loadError ? (
+              <div className="grid min-h-80 place-items-center text-center">
+                <div>
+                  <Building2 className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-4 text-lg font-black">{loadError}</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Refresh the page and try again.
+                  </p>
+                </div>
+              </div>
+            ) : filteredPlaces.length > 0 ? (
+              <div className="mt-10 grid gap-8 md:grid-cols-2 2xl:grid-cols-3">
+                {filteredPlaces.map((place) => (
+                  <div key={place.id} className="min-w-0">
+                    {place.isLocalPartner ? (
+                      <div className="mb-3 flex items-center gap-2 px-1">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 ring-4 ring-amber-300/40" />
+                        <span className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+                          Verified local partner
+                        </span>
+                      </div>
+                    ) : null}
+
+                    <PlacePost
+                      id={place.id}
+                      title={place.name}
+                      description={place.description}
+                      location_name={place.community}
+                      address={place.address}
+                      postcode={place.postcode}
+                      images={place.images}
+                      tags={place.tags}
+                      opening_hours={
+                        normaliseOpeningHours(place.openingHours) ?? undefined
+                      }
+                      is_24_7={place.open24Seven}
+                      slug={
+                        place.href.startsWith("/places/")
+                          ? place.href.replace("/places/", "")
+                          : null
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-8 rounded-[2rem] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                <MapPin className="mx-auto h-10 w-10 text-slate-300" />
+                <h3 className="mt-4 text-xl font-black">
+                  No places found here yet
+                </h3>
+                <p className="mx-auto mt-2 max-w-md leading-7 text-slate-500">
+                  This community still belongs on the map. Listings will appear
+                  here as local places join ELO.
                 </p>
               </div>
-            </div>
-          ) : filteredPlaces.length > 0 ? (
-            <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredPlaces.map((place) => (
-                <PlaceCard key={place.id} place={place} now={now} />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-7 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
-              <MapPin className="mx-auto h-10 w-10 text-slate-300" />
-              <h3 className="mt-4 text-xl font-black">
-                No places found here yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-md leading-7 text-slate-500">
-                This community still belongs on the map. Listings will appear
-                here as local places join Atlas.
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </main>
 

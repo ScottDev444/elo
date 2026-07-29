@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
@@ -7,7 +8,6 @@ import {
   Clock3,
   MapPin,
   Navigation,
-  Sparkles,
 } from "lucide-react";
 
 type OpeningHours = Record<
@@ -45,11 +45,12 @@ const dayNames = [
 
 function getTodayHours(
   openingHours?: OpeningHours | null,
-  isTwentyFourSeven?: boolean | null
+  isTwentyFourSeven?: boolean | null,
 ) {
-  if (isTwentyFourSeven) {
+  if (isTwentyFourSeven === true) {
     return {
-      label: "Open 24 hours",
+      label: "Open 24/7",
+      statusLabel: "Open 24/7",
       isOpen: true,
     };
   }
@@ -57,6 +58,7 @@ function getTodayHours(
   if (!openingHours) {
     return {
       label: "Hours unavailable",
+      statusLabel: "Hours unavailable",
       isOpen: false,
     };
   }
@@ -67,6 +69,7 @@ function getTodayHours(
   if (!hours || hours.closed) {
     return {
       label: "Closed today",
+      statusLabel: "Closed Today",
       isOpen: false,
     };
   }
@@ -74,12 +77,14 @@ function getTodayHours(
   if (!hours.open || !hours.close) {
     return {
       label: "Hours unavailable",
+      statusLabel: "Hours unavailable",
       isOpen: false,
     };
   }
 
   return {
     label: `${hours.open} – ${hours.close}`,
+    statusLabel: "Open Now",
     isOpen: true,
   };
 }
@@ -97,32 +102,76 @@ export default function PlacePost({
   is_24_7,
   slug,
 }: PlacePostProps) {
-  const image = images?.[0];
-  const todayHours = getTodayHours(opening_hours, is_24_7);
-
-  const href = slug ? `/places/${slug}` : `/places/${id}`;
-
-  const directionsQuery = encodeURIComponent(
-    [address, postcode].filter(Boolean).join(", ")
+  const usableImages = useMemo(
+    () =>
+      (images ?? []).filter(
+        (image): image is string =>
+          typeof image === "string" &&
+          image.trim().length > 0,
+      ),
+    [images],
   );
+
+  const [imageIndex, setImageIndex] =
+    useState(0);
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [usableImages]);
+
+  const image =
+    usableImages[imageIndex];
+
+  const todayHours = getTodayHours(
+    opening_hours,
+    is_24_7,
+  );
+
+  const href = slug
+    ? `/places/${slug}`
+    : `/places/${id}`;
+
+  const directionsQuery =
+    encodeURIComponent(
+      [address, postcode]
+        .filter(Boolean)
+        .join(", "),
+    );
+
+  function tryNextImage() {
+    setImageIndex((currentIndex) =>
+      currentIndex + 1,
+    );
+  }
 
   return (
     <motion.article
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
+      viewport={{
+        once: true,
+        margin: "-80px",
+      }}
+      transition={{
+        duration: 0.45,
+        ease: "easeOut",
+      }}
       whileHover={{ y: -4 }}
       className="group overflow-hidden rounded-[2rem] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)] ring-1 ring-black/5"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
         {image ? (
           <motion.img
+            key={image}
             src={image}
             alt={title}
             className="h-full w-full object-cover"
             whileHover={{ scale: 1.045 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{
+              duration: 0.5,
+              ease: "easeOut",
+            }}
+            onError={tryNextImage}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
@@ -142,11 +191,13 @@ export default function PlacePost({
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                todayHours.isOpen ? "bg-white" : "bg-slate-400"
+                todayHours.isOpen
+                  ? "bg-white"
+                  : "bg-slate-400"
               }`}
             />
 
-            {todayHours.isOpen ? "Open Now" : "Closed Today"}
+            {todayHours.statusLabel}
           </span>
         </div>
 
@@ -218,7 +269,9 @@ export default function PlacePost({
                 Location
               </p>
               <p className="truncate text-sm font-bold text-slate-900">
-                {[address, postcode].filter(Boolean).join(", ") ||
+                {[address, postcode]
+                  .filter(Boolean)
+                  .join(", ") ||
                   "Location unavailable"}
               </p>
             </div>

@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -25,6 +27,10 @@ type PostMetadata = {
   active_dates?: string[];
   location?: string;
   slug?: string;
+  description?: string;
+  address?: string;
+  category?: string;
+  tags?: string[];
 };
 
 type SearchPost = {
@@ -43,6 +49,19 @@ type SearchGroup = {
   slug: string | null;
 };
 
+type SearchPlace = {
+  id: string;
+  page_id: string | null;
+  title: string;
+  description: string | null;
+  location_name: string | null;
+  address: string | null;
+  postcode: string | null;
+  tags: string[] | null;
+  slug: string | null;
+  is_active: boolean | null;
+};
+
 type SearchResult =
   | {
       kind: "today";
@@ -50,7 +69,7 @@ type SearchResult =
     }
   | {
       kind: "place";
-      post: SearchPost;
+      place: SearchPlace;
     }
   | {
       kind: "upcoming";
@@ -118,12 +137,6 @@ function getActiveDates(post: SearchPost) {
   );
 }
 
-function isPlace(post: SearchPost) {
-  return post.metadata?.public_type
-    ?.trim()
-    .toLowerCase() === "place";
-}
-
 function isPostActive(post: SearchPost) {
   if (!post.metadata?.public_type) {
     return false;
@@ -140,14 +153,6 @@ function isPostActive(post: SearchPost) {
     ) {
       return false;
     }
-  }
-
-  /*
-   * Places are permanent search results and do not
-   * need active_dates.
-   */
-  if (isPlace(post)) {
-    return true;
   }
 
   const activeDates = getActiveDates(post);
@@ -280,7 +285,21 @@ function getPostSearchText(post: SearchPost) {
     post.title,
     post.content,
     post.metadata?.location,
+    post.metadata?.category,
     post.metadata?.public_type,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getPlaceSearchText(place: SearchPlace) {
+  return [
+    place.title,
+    place.description,
+    place.location_name,
+    place.address,
+    place.postcode,
+    ...(Array.isArray(place.tags) ? place.tags : []),
   ]
     .filter(Boolean)
     .join(" ");
@@ -308,20 +327,21 @@ function getSearchScore(
 
   let score = 0;
 
+  /*
+   * Title relevance deliberately dominates everything else.
+   * A weak description match should never outrank a strong
+   * page, place or post title match.
+   */
   if (normalisedTitle === normalisedQuery) {
-    score += 300;
-  }
-
-  if (normalisedTitle.startsWith(normalisedQuery)) {
-    score += 180;
-  }
-
-  if (normalisedTitle.includes(normalisedQuery)) {
-    score += 120;
+    score += 1200;
+  } else if (normalisedTitle.startsWith(normalisedQuery)) {
+    score += 900;
+  } else if (normalisedTitle.includes(normalisedQuery)) {
+    score += 650;
   }
 
   if (normalisedText.includes(normalisedQuery)) {
-    score += 60;
+    score += 80;
   }
 
   const words = query
@@ -329,11 +349,16 @@ function getSearchScore(
     .split(/\s+/)
     .filter(Boolean);
 
+  const lowerTitle = title.toLocaleLowerCase("en-GB");
   const lowerText = searchableText.toLocaleLowerCase("en-GB");
 
   score +=
+    words.filter((word) => lowerTitle.includes(word)).length *
+    120;
+
+  score +=
     words.filter((word) => lowerText.includes(word)).length *
-    20;
+    12;
 
   return score;
 }
@@ -356,9 +381,15 @@ function truncate(
 }
 
 function getResultId(result: SearchResult) {
-  return result.kind === "group"
-    ? result.group.id
-    : result.post.id;
+  if (result.kind === "group") {
+    return result.group.id;
+  }
+
+  if (result.kind === "place") {
+    return result.place.id;
+  }
+
+  return result.post.id;
 }
 
 function getResultKey(result: SearchResult) {
@@ -367,34 +398,56 @@ function getResultKey(result: SearchResult) {
 
 function getResultHref(result: SearchResult) {
   if (result.kind === "group") {
-    return `/groups/${result.group.slug ?? result.group.id}`;
+    return `/page/${result.group.slug ?? result.group.id}`;
   }
 
   if (result.kind === "place") {
-    return `/places/${
-      result.post.metadata?.slug ?? result.post.id
-    }`;
+    return `/places/${result.place.slug ?? result.place.id}`;
   }
 
   return `/posts/${result.post.id}`;
 }
 
 function getResultTitle(result: SearchResult) {
-  return result.kind === "group"
-    ? result.group.name
-    : result.post.title;
+  if (result.kind === "group") {
+    return result.group.name;
+  }
+
+  if (result.kind === "place") {
+    return result.place.title;
+  }
+
+  return result.post.title;
 }
 
 function getResultDescription(result: SearchResult) {
-  return result.kind === "group"
-    ? truncate(result.group.description)
-    : truncate(result.post.content);
+  if (result.kind === "group") {
+    return truncate(result.group.description);
+  }
+
+  if (result.kind === "place") {
+    return truncate(result.place.description);
+  }
+
+  return truncate(result.post.content);
 }
 
 function getResultLocation(result: SearchResult) {
-  return result.kind === "group"
-    ? null
-    : result.post.metadata?.location;
+  if (result.kind === "place") {
+    return [
+      result.place.location_name,
+      result.place.address,
+      result.place.postcode,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  if (result.kind === "group") {
+    return null;
+  }
+
+  return result.post.metadata?.location;
 }
 
 function ResultIcon({
@@ -441,10 +494,10 @@ function SearchResultItem({
   const location = getResultLocation(result);
 
   return (
-    <Link
-      href={getResultHref(result)}
+    <button
+      type="button"
       onClick={() => onSelect(result)}
-      className="group/result flex gap-3 rounded-2xl px-3 py-3 transition hover:bg-emerald-50 focus-visible:bg-emerald-50 focus-visible:outline-none"
+      className="group/result flex w-full gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-emerald-50 focus-visible:bg-emerald-50 focus-visible:outline-none"
     >
       <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover/result:bg-emerald-600 group-hover/result:text-white">
         <ResultIcon result={result} />
@@ -468,14 +521,16 @@ function SearchResultItem({
           </span>
         )}
       </span>
-    </Link>
+    </button>
   );
 }
 
 export default function HomeSearch() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const logTimerRef = useRef<
     ReturnType<typeof setTimeout> | undefined
@@ -487,9 +542,15 @@ export default function HomeSearch() {
 
   const [query, setQuery] = useState("");
   const [posts, setPosts] = useState<SearchPost[]>([]);
+  const [places, setPlaces] = useState<SearchPlace[]>([]);
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [dropdownStyle, setDropdownStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const [error, setError] = useState<string | null>(
     null,
@@ -537,7 +598,7 @@ export default function HomeSearch() {
       setIsLoading(true);
       setError(null);
 
-      const [postsResponse, groupsResponse] =
+      const [postsResponse, placesResponse, groupsResponse] =
         await Promise.all([
           supabase.from("posts").select(`
             id,
@@ -547,6 +608,22 @@ export default function HomeSearch() {
             expires_at,
             metadata
           `),
+
+          supabase
+            .from("places")
+            .select(`
+              id,
+              page_id,
+              title,
+              description,
+              location_name,
+              address,
+              postcode,
+              tags,
+              slug,
+              is_active
+            `)
+            .eq("is_active", true),
 
           supabase.from("groups").select(`
             id,
@@ -573,8 +650,21 @@ export default function HomeSearch() {
         return;
       }
 
+      if (placesResponse.error) {
+        console.error("Could not load search places:", {
+          message: placesResponse.error.message,
+          details: placesResponse.error.details,
+          hint: placesResponse.error.hint,
+          code: placesResponse.error.code,
+        });
+
+        setError("Search is temporarily unavailable.");
+        setIsLoading(false);
+        return;
+      }
+
       if (groupsResponse.error) {
-        console.error("Could not load search groups:", {
+        console.error("Could not load search pages:", {
           message: groupsResponse.error.message,
           details: groupsResponse.error.details,
           hint: groupsResponse.error.hint,
@@ -586,14 +676,9 @@ export default function HomeSearch() {
         return;
       }
 
-      setPosts(
-        (postsResponse.data ?? []) as SearchPost[],
-      );
-
-      setGroups(
-        (groupsResponse.data ?? []) as SearchGroup[],
-      );
-
+      setPosts((postsResponse.data ?? []) as SearchPost[]);
+      setPlaces((placesResponse.data ?? []) as SearchPlace[]);
+      setGroups((groupsResponse.data ?? []) as SearchGroup[]);
       setIsLoading(false);
     }
 
@@ -609,17 +694,15 @@ export default function HomeSearch() {
     [posts],
   );
 
-  const groupIdsWithPlaces = useMemo(() => {
-    return new Set(
-      posts
-        .filter(
-          (post) =>
-            isPlace(post) &&
-            typeof post.group_id === "string",
-        )
-        .map((post) => post.group_id as string),
-    );
-  }, [posts]);
+  const groupIdsWithPlaces = useMemo(
+    () =>
+      new Set(
+        places
+          .map((place) => place.page_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [places],
+  );
 
   const sections = useMemo<SearchSection[]>(() => {
     const cleanedQuery = query.trim();
@@ -639,56 +722,41 @@ export default function HomeSearch() {
       }))
       .filter(({ score }) => score > 0);
 
-    const todayResults: SearchResult[] = matchingPosts
+    const todayMatches = matchingPosts
+      .filter(({ post }) => isOnToday(post))
+      .sort((a, b) => b.score - a.score);
+
+    const upcomingMatches = matchingPosts
       .filter(
         ({ post }) =>
-          !isPlace(post) && isOnToday(post),
+          !isOnToday(post) &&
+          isInUpcomingWindow(post),
       )
-      .sort((a, b) => b.score - a.score)
-      .slice(0, RESULTS_PER_SECTION)
-      .map(({ post }) => ({
-        kind: "today",
-        post,
-      }));
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
 
-    const placeResults: SearchResult[] = matchingPosts
-      .filter(({ post }) => isPlace(post))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, RESULTS_PER_SECTION)
-      .map(({ post }) => ({
-        kind: "place",
-        post,
-      }));
+        return (
+          getNextActiveDate(a.post) -
+          getNextActiveDate(b.post)
+        );
+      });
 
-    const upcomingResults: SearchResult[] =
-      matchingPosts
-        .filter(
-          ({ post }) =>
-            !isPlace(post) &&
-            !isOnToday(post) &&
-            isInUpcomingWindow(post),
-        )
-        .sort((a, b) => {
-          if (b.score !== a.score) {
-            return b.score - a.score;
-          }
+    const placeMatches = places
+      .map((place) => ({
+        place,
+        score: getSearchScore(
+          cleanedQuery,
+          place.title,
+          getPlaceSearchText(place),
+        ),
+      }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score);
 
-          return (
-            getNextActiveDate(a.post) -
-            getNextActiveDate(b.post)
-          );
-        })
-        .slice(0, RESULTS_PER_SECTION)
-        .map(({ post }) => ({
-          kind: "upcoming",
-          post,
-        }));
-
-    const groupResults: SearchResult[] = groups
-      .filter(
-        (group) =>
-          !groupIdsWithPlaces.has(group.id),
-      )
+    const groupMatches = groups
+      .filter((group) => !groupIdsWithPlaces.has(group.id))
       .map((group) => ({
         group,
         score: getSearchScore(
@@ -698,41 +766,76 @@ export default function HomeSearch() {
         ),
       }))
       .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, RESULTS_PER_SECTION)
-      .map(({ group }) => ({
-        kind: "group",
-        group,
-      }));
+      .sort((a, b) => b.score - a.score);
 
     return [
       {
-        id: "today",
+        id: "today" as const,
         title: "On today",
-        results: todayResults,
+        rank: todayMatches[0]?.score ?? 0,
+        priority: 4,
+        results: todayMatches
+          .slice(0, RESULTS_PER_SECTION)
+          .map(({ post }) => ({
+            kind: "today" as const,
+            post,
+          })),
       },
       {
-        id: "places",
+        id: "places" as const,
         title: "Places",
-        results: placeResults,
+        rank: placeMatches[0]?.score ?? 0,
+        priority: 3,
+        results: placeMatches
+          .slice(0, RESULTS_PER_SECTION)
+          .map(({ place }) => ({
+            kind: "place" as const,
+            place,
+          })),
       },
       {
-        id: "upcoming",
+        id: "groups" as const,
+        title: "Pages",
+        rank: groupMatches[0]?.score ?? 0,
+        priority: 2,
+        results: groupMatches
+          .slice(0, RESULTS_PER_SECTION)
+          .map(({ group }) => ({
+            kind: "group" as const,
+            group,
+          })),
+      },
+      {
+        id: "upcoming" as const,
         title: getUpcomingWindow().title,
-        results: upcomingResults,
+        rank: upcomingMatches[0]?.score ?? 0,
+        priority: 1,
+        results: upcomingMatches
+          .slice(0, RESULTS_PER_SECTION)
+          .map(({ post }) => ({
+            kind: "upcoming" as const,
+            post,
+          })),
       },
-      {
-        id: "groups",
-        title: "Groups",
-        results: groupResults,
-      },
-    ].filter(
-      (section) => section.results.length > 0,
-    ) as SearchSection[];
+    ]
+      .filter((section) => section.results.length > 0)
+      .sort((a, b) => {
+        if (b.rank !== a.rank) {
+          return b.rank - a.rank;
+        }
+
+        return b.priority - a.priority;
+      })
+      .map(({ id, title, results }) => ({
+        id,
+        title,
+        results,
+      })) as SearchSection[];
   }, [
     activePosts,
     groupIdsWithPlaces,
     groups,
+    places,
     query,
   ]);
 
@@ -810,12 +913,13 @@ export default function HomeSearch() {
     function handleOutsidePointer(
       event: PointerEvent,
     ) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(
-          event.target as Node,
-        )
-      ) {
+      const target = event.target as Node;
+
+      const clickedInsideSearch =
+        containerRef.current?.contains(target) ||
+        dropdownRef.current?.contains(target);
+
+      if (!clickedInsideSearch) {
         recordAbandonedSearch();
         setIsFocused(false);
       }
@@ -857,7 +961,7 @@ export default function HomeSearch() {
     selectedResultRef.current = false;
   }
 
-  function handleResultSelect() {
+  function handleResultSelect(result: SearchResult) {
     selectedResultRef.current = true;
 
     void recordSearchLog({
@@ -865,12 +969,115 @@ export default function HomeSearch() {
       type: "selected",
     });
 
+    const href = getResultHref(result);
+
     activeQueryRef.current = "";
+    router.push(href);
     setIsFocused(false);
   }
 
   const showDropdown =
     isFocused && query.trim().length > 0;
+
+  useLayoutEffect(() => {
+    if (!showDropdown) {
+      setDropdownStyle(null);
+      return;
+    }
+
+    function updateDropdownPosition() {
+      const element = containerRef.current;
+
+      if (!element) {
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+
+      setDropdownStyle({
+        top: rect.bottom + 12,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+
+    updateDropdownPosition();
+
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [showDropdown]);
+
+  const dropdown =
+    showDropdown && dropdownStyle && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: dropdownStyle.top,
+              left: dropdownStyle.left,
+              width: dropdownStyle.width,
+              zIndex: 2147483647,
+            }}
+            className="max-h-[min(34rem,65vh)] overflow-y-auto rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30"
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-neutral-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading…
+              </div>
+            ) : error ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-sm font-semibold text-red-600">
+                  {error}
+                </p>
+              </div>
+            ) : totalResults === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <Search className="mx-auto h-5 w-5 text-neutral-400" />
+
+                <p className="mt-3 text-sm font-semibold text-neutral-900">
+                  Nothing found
+                </p>
+
+                <p className="mt-1 text-xs text-neutral-500">
+                  Try another place, event or page.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sections.map((section) => (
+                  <section key={section.id}>
+                    <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-emerald-600">
+                      <SectionIcon sectionId={section.id} />
+
+                      <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+                        {section.title}
+                      </h2>
+                    </div>
+
+                    <div>
+                      {section.results.map((result) => (
+                        <SearchResultItem
+                          key={getResultKey(result)}
+                          result={result}
+                          onSelect={handleResultSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div
@@ -916,60 +1123,7 @@ export default function HomeSearch() {
         </div>
       </div>
 
-      {showDropdown && (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 max-h-[min(34rem,65vh)] overflow-y-auto rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30">
-          {isLoading ? (
-            <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-neutral-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : error ? (
-            <div className="px-5 py-10 text-center">
-              <p className="text-sm font-semibold text-red-600">
-                {error}
-              </p>
-            </div>
-          ) : totalResults === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <Search className="mx-auto h-5 w-5 text-neutral-400" />
-
-              <p className="mt-3 text-sm font-semibold text-neutral-900">
-                Nothing found
-              </p>
-
-              <p className="mt-1 text-xs text-neutral-500">
-                Try another place, event or group.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sections.map((section) => (
-                <section key={section.id}>
-                  <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-emerald-600">
-                    <SectionIcon
-                      sectionId={section.id}
-                    />
-
-                    <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">
-                      {section.title}
-                    </h2>
-                  </div>
-
-                  <div>
-                    {section.results.map((result) => (
-                      <SearchResultItem
-                        key={getResultKey(result)}
-                        result={result}
-                        onSelect={handleResultSelect}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }

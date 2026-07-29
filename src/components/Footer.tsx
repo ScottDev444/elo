@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Mail, MapPin, ShieldCheck } from "lucide-react";
@@ -191,30 +192,34 @@ export default function Footer() {
               href="/"
               className="inline-flex items-center gap-3"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-xl shadow-lg shadow-emerald-950/20 backdrop-blur-xl">
-                🌍
-              </div>
+              <Image
+                src="/logo-new.png"
+                alt="East Lothian Online"
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-xl object-contain"
+              />
 
               <div>
                 <p className="text-xl font-bold tracking-tight text-white">
-                  Atlas Community
+                  East Lothian Online
                 </p>
 
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/65">
-                  The world in your pocket
+                  Your Community's Digital Home
                 </p>
               </div>
             </Link>
 
             <p className="mt-5 max-w-md text-sm leading-6 text-white/70">
-              Community by Atlas connects people with the places, events, deals and alerts
-              happening around them. East Lothian is the first local
-              community powered by Atlas.
+              East Lothian Online is the first Community of Atlas — building a world where you'll always know what's happening locally, wherever you go.
+
+Atlas — The World in Your Pocket.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <a
-                href="https://www.instagram.com/"
+                href="https://www.instagram.com/eastlothian.online"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Instagram"
@@ -224,7 +229,7 @@ export default function Footer() {
               </a>
 
               <a
-                href="https://www.facebook.com/"
+                href="https://www.facebook.com/eastlothian.online"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Facebook"
@@ -234,7 +239,7 @@ export default function Footer() {
               </a>
 
               <a
-                href="mailto:hello@eastlothian.online"
+                href="mailto:eastlothian.online@outlook.com"
                 aria-label="Email East Lothian Online"
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white shadow-md shadow-emerald-950/10 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/50 hover:bg-white/25"
               >
@@ -275,25 +280,25 @@ export default function Footer() {
               </Link>
 
               <Link
-                href="/contact"
-                className="block text-sm text-white/65 transition hover:translate-x-1 hover:text-white"
-              >
-                Contact
-              </Link>
-
-              <Link
-                href="/business"
+                href="/partnership"
                 className="block text-sm text-white/65 transition hover:translate-x-1 hover:text-white"
               >
                 Local Partnership
               </Link>
 
               <Link
-                href="/submit"
+                href="/create-page"
                 className="block text-sm text-white/65 transition hover:translate-x-1 hover:text-white"
               >
-                Submit a page
+                Create a page
               </Link>
+
+              <a
+                href="mailto:eastlothian.online@outlook.com"
+                className="block break-all text-sm text-white/65 transition hover:translate-x-1 hover:text-white"
+              >
+                eastlothian.online@outlook.com
+              </a>
             </div>
           </motion.div>
 
@@ -356,7 +361,7 @@ export default function Footer() {
 
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/55">
-            <span>© {currentYear} Atlas</span>
+            <span>© {currentYear} East Lothian Online</span>
 
             <span className="inline-flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5" />
@@ -365,12 +370,12 @@ export default function Footer() {
 
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Community-first platform
+              Independent
             </span>
           </div>
 
           <p className="text-xs font-semibold tracking-wide text-white/55">
-            Atlas — The world in your pocket.
+            East Lothian Online — Your Communities Digital Home.
           </p>
         </div>
       </div>

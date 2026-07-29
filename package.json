@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
+    "@stripe/react-stripe-js": "^6.8.0",
+    "@stripe/stripe-js": "^9.12.1",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
     "clsx": "^2.1.1",
@@ -29,6 +31,7 @@
     "recharts": "^3.10.0",
     "sharp": "^0.35.3",
     "sonner": "^2.0.7",
+    "stripe": "^22.3.2",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

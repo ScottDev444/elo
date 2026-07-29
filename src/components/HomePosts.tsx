@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { LoaderCircle } from "lucide-react";
 
@@ -21,7 +21,20 @@ type PostMetadata = {
   featured?: boolean | null;
   deal_kind?: string | null;
   alert_icon?: string | null;
-  deal_price?: string | null;
+  deal_price?: string | number | null;
+  buy_quantity?: number | null;
+  pay_quantity?: number | null;
+  discount_percent?: number | null;
+};
+
+type CardMetadata = {
+  public_type?: string | null;
+  active_dates?: string[] | null;
+  location?: string | null;
+  featured?: boolean | null;
+  deal_kind?: string | null;
+  alert_icon?: string | null;
+  deal_price?: number | null;
   buy_quantity?: number | null;
   pay_quantity?: number | null;
   discount_percent?: number | null;
@@ -46,6 +59,8 @@ type DatabasePost = {
 type DatabaseGroup = {
   id: string;
   name: string | null;
+  brand_color: string | null;
+  is_local_partner: boolean | null;
 };
 
 type DayHours = {
@@ -84,6 +99,7 @@ type DisplayPost = {
   id: string;
   category: string;
   colour: PostColour;
+  type: "event" | "deal" | "post";
   title: string;
   description: string;
   href: string;
@@ -92,7 +108,11 @@ type DisplayPost = {
   dates: string[];
   postedBy?: string;
   location?: string;
+  brandColour?: string;
+  metadata: CardMetadata | null;
   featured?: boolean;
+  isLocalPartner: boolean;
+  createdAt: string;
   sortDate: string;
 };
 
@@ -109,6 +129,208 @@ type FeedItem =
       place: DatabasePlace;
       animationIndex: number;
     };
+
+type AnalyticsEventType =
+  | "impression"
+  | "conversion";
+
+function getAnalyticsSessionId() {
+  const storageKey = "elo_analytics_session_id";
+
+  try {
+    const existing =
+      window.localStorage.getItem(storageKey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const sessionId = crypto.randomUUID();
+
+    window.localStorage.setItem(
+      storageKey,
+      sessionId,
+    );
+
+    return sessionId;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+function hasTrackedEvent(
+  postId: string,
+  eventType: AnalyticsEventType,
+) {
+  try {
+    return (
+      window.sessionStorage.getItem(
+        `elo_post_${eventType}_${postId}`,
+      ) === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function markEventTracked(
+  postId: string,
+  eventType: AnalyticsEventType,
+) {
+  try {
+    window.sessionStorage.setItem(
+      `elo_post_${eventType}_${postId}`,
+      "true",
+    );
+  } catch {
+    // Analytics should never interrupt the feed.
+  }
+}
+
+async function recordPostAnalytics(
+  postId: string,
+  eventType: AnalyticsEventType,
+) {
+  if (hasTrackedEvent(postId, eventType)) {
+    return;
+  }
+
+  markEventTracked(postId, eventType);
+
+  try {
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("post_analytics")
+      .insert({
+        post_id: postId,
+        event_type: eventType,
+        session_id: getAnalyticsSessionId(),
+      });
+
+    if (error) {
+      console.error(
+        `Failed to record post ${eventType}:`,
+        error,
+      );
+    }
+  } catch (error) {
+    console.error(
+      `Failed to record post ${eventType}:`,
+      error,
+    );
+  }
+}
+
+function AnalyticsPostWrapper({
+  postId,
+  children,
+}: {
+  postId: string;
+  children: ReactNode;
+}) {
+  const wrapperRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const impressionTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+
+  useEffect(() => {
+    const element = wrapperRef.current;
+
+    if (
+      !element ||
+      hasTrackedEvent(postId, "impression")
+    ) {
+      return;
+    }
+
+    if (!("IntersectionObserver" in window)) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (
+          entry.isIntersecting &&
+          entry.intersectionRatio >= 0.5
+        ) {
+          if (!impressionTimerRef.current) {
+            impressionTimerRef.current =
+              setTimeout(() => {
+                void recordPostAnalytics(
+                  postId,
+                  "impression",
+                );
+
+                observer.disconnect();
+                impressionTimerRef.current = null;
+              }, 1000);
+          }
+
+          return;
+        }
+
+        if (impressionTimerRef.current) {
+          clearTimeout(
+            impressionTimerRef.current,
+          );
+
+          impressionTimerRef.current = null;
+        }
+      },
+      {
+        threshold: [0, 0.5, 1],
+      },
+    );
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+
+      if (impressionTimerRef.current) {
+        clearTimeout(
+          impressionTimerRef.current,
+        );
+      }
+    };
+  }, [postId]);
+
+  function handleClick(
+    event: React.MouseEvent<HTMLDivElement>,
+  ) {
+    const target = event.target;
+
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const postLink = target.closest(
+      'a[href^="/posts/"]',
+    );
+
+    if (!postLink) {
+      return;
+    }
+
+    void recordPostAnalytics(
+      postId,
+      "conversion",
+    );
+  }
+
+  return (
+    <div
+      ref={wrapperRef}
+      onClickCapture={handleClick}
+    >
+      {children}
+    </div>
+  );
+}
 
 const DAY_NAMES = [
   "sunday",
@@ -235,7 +457,7 @@ function isPlaceOpenNow(
     return false;
   }
 
-  if (isTrue(place.is_24_7)) {
+  if (isTrue(place.metadata?.open_24_7)) {
     return true;
   }
 
@@ -538,9 +760,65 @@ function isPostActive(
 
 function mapPost(
   post: DatabasePost,
-  groupNames: Map<string, string>,
+  groups: Map<
+    string,
+    {
+      name?: string;
+      brandColour?: string;
+      isLocalPartner: boolean;
+    }
+  >,
 ): DisplayPost {
   const type = getPostType(post);
+  const normalisedType = type.toLowerCase();
+
+  const cardType: "event" | "deal" | "post" =
+    normalisedType === "event"
+      ? "event"
+      : normalisedType === "deal"
+        ? "deal"
+        : "post";
+
+  const group = post.group_id
+    ? groups.get(post.group_id)
+    : undefined;
+
+  const rawDealPrice =
+    post.metadata?.deal_price ??
+    post.deal_price ??
+    null;
+
+  const parsedDealPrice =
+    rawDealPrice === null ||
+    rawDealPrice === undefined ||
+    rawDealPrice === ""
+      ? null
+      : Number(rawDealPrice);
+
+  const cardMetadata: CardMetadata = {
+    ...(post.metadata ?? {}),
+    public_type:
+      post.metadata?.public_type ?? post.type,
+    active_dates:
+      post.metadata?.active_dates ?? [],
+    location:
+      post.metadata?.location ?? null,
+    featured:
+      post.metadata?.featured ?? false,
+    deal_kind:
+      post.metadata?.deal_kind ?? null,
+    alert_icon:
+      post.metadata?.alert_icon ?? null,
+    deal_price: Number.isFinite(parsedDealPrice)
+      ? parsedDealPrice
+      : null,
+    buy_quantity:
+      post.metadata?.buy_quantity ?? null,
+    pay_quantity:
+      post.metadata?.pay_quantity ?? null,
+    discount_percent:
+      post.metadata?.discount_percent ?? null,
+  };
 
   const upcomingDates =
     getUpcomingDates(post);
@@ -560,6 +838,7 @@ function mapPost(
     id: post.id,
     category: formatCategory(type),
     colour: getPostColour(type),
+    type: cardType,
     title: post.title,
 
     description: getFirstSentence(
@@ -572,25 +851,32 @@ function mapPost(
       ? post.image_url ?? undefined
       : undefined,
 
-    date: formatActiveDate(
-      nextActiveDate,
-    ),
+    date: nextActiveDate,
 
     dates: upcomingDates,
 
-    postedBy: post.group_id
-      ? groupNames.get(post.group_id)
-      : undefined,
+    postedBy: group?.name,
 
     location:
       post.metadata?.location ??
       undefined,
 
+    brandColour:
+      group?.brandColour,
+
+    metadata: cardMetadata,
+
     featured,
+
+    isLocalPartner:
+      group?.isLocalPartner ?? false,
+
+    createdAt:
+      post.created_at ??
+      "9999-12-31T23:59:59.999Z",
 
     sortDate:
       nextActiveDate ??
-      post.created_at ??
       "9999-12-31",
   };
 }
@@ -622,41 +908,55 @@ function shufflePlaces(
   return shuffled;
 }
 
+function getGreeting(
+  date = new Date(),
+) {
+  const hour = date.getHours();
+
+  if (hour < 12) {
+    return "Good morning";
+  }
+
+  if (hour < 18) {
+    return "Good afternoon";
+  }
+
+  return "Good evening";
+}
+
+function getFirstName(
+  value: string | null | undefined,
+) {
+  if (!value) {
+    return null;
+  }
+
+  const cleanedValue = value
+    .trim()
+    .replace(/[@._-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!cleanedValue) {
+    return null;
+  }
+
+  const firstName =
+    cleanedValue.split(" ")[0];
+
+  return (
+    firstName.charAt(0).toUpperCase() +
+    firstName.slice(1)
+  );
+}
+
 function createFeedItems(
   posts: DisplayPost[],
   places: DatabasePlace[],
 ): FeedItem[] {
   const items: FeedItem[] = [];
 
-  const openPlaces = places.filter(
-    (place) => isPlaceOpenNow(place),
-  );
-
-  const alwaysVisiblePlaces =
-    shufflePlaces(
-      openPlaces.filter((place) =>
-        isTrue(place.is_24_7),
-      ),
-    );
-
-  const regularOpenPlaces =
-    shufflePlaces(
-      openPlaces.filter(
-        (place) =>
-          !isTrue(place.is_24_7),
-      ),
-    );
-
-  alwaysVisiblePlaces.forEach(
-    (place) => {
-      items.push({
-        kind: "place",
-        key: `place-${place.id}`,
-        place,
-        animationIndex:
-          items.length,
-      });
-    },
+  const openPlaces = shufflePlaces(
+    places.filter((place) => isPlaceOpenNow(place)),
   );
 
   let placeIndex = 0;
@@ -676,7 +976,7 @@ function createFeedItems(
 
     const shouldInsertPlace =
       placeIndex <
-        regularOpenPlaces.length &&
+        openPlaces.length &&
       postsSincePlace >=
         nextPlaceAfter &&
       index < posts.length - 1;
@@ -686,7 +986,7 @@ function createFeedItems(
     }
 
     const place =
-      regularOpenPlaces[placeIndex];
+      openPlaces[placeIndex];
 
     items.push({
       kind: "place",
@@ -720,6 +1020,12 @@ export default function HomePosts() {
     string | null
   >(null);
 
+  const [firstName, setFirstName] =
+    useState<string | null>(null);
+
+  const [greeting, setGreeting] =
+    useState(() => getGreeting());
+
   const feedItems = useMemo(
     () =>
       createFeedItems(
@@ -732,6 +1038,43 @@ export default function HomePosts() {
   useEffect(() => {
     const supabase =
       createClient();
+
+    async function loadUser() {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        setFirstName(null);
+        return;
+      }
+
+      const {
+        data: publicUser,
+        error: publicUserError,
+      } = await supabase
+        .from("users")
+        .select("username")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (publicUserError) {
+        console.error(
+          "Failed to load public user:",
+          publicUserError,
+        );
+
+        setFirstName(null);
+        return;
+      }
+
+      setFirstName(
+        getFirstName(
+          publicUser?.username,
+        ),
+      );
+    }
 
     async function loadContent() {
       setLoading(true);
@@ -854,9 +1197,13 @@ export default function HomePosts() {
         ),
       ];
 
-      const groupNames = new Map<
+      const groups = new Map<
         string,
-        string
+        {
+          name?: string;
+          brandColour?: string;
+          isLocalPartner: boolean;
+        }
       >();
 
       if (groupIds.length > 0) {
@@ -865,7 +1212,7 @@ export default function HomePosts() {
           error: groupsError,
         } = await supabase
           .from("groups")
-          .select("id, name")
+          .select("id, name, brand_color, is_local_partner")
           .in("id", groupIds);
 
         if (groupsError) {
@@ -876,12 +1223,13 @@ export default function HomePosts() {
         } else {
           for (const group of (groupsData ??
             []) as DatabaseGroup[]) {
-            if (group.name) {
-              groupNames.set(
-                group.id,
-                group.name,
-              );
-            }
+            groups.set(group.id, {
+              name: group.name ?? undefined,
+              brandColour:
+                group.brand_color ?? undefined,
+              isLocalPartner:
+                group.is_local_partner === true,
+            });
           }
         }
       }
@@ -891,14 +1239,39 @@ export default function HomePosts() {
           .map((post) =>
             mapPost(
               post,
-              groupNames,
+              groups,
             ),
           )
-          .sort((a, b) =>
-            a.sortDate.localeCompare(
-              b.sortDate,
-            ),
-          );
+          .sort((a, b) => {
+            const dateOrder =
+              a.sortDate.localeCompare(
+                b.sortDate,
+              );
+
+            if (dateOrder !== 0) {
+              return dateOrder;
+            }
+
+            if (
+              a.isLocalPartner !==
+              b.isLocalPartner
+            ) {
+              return a.isLocalPartner
+                ? -1
+                : 1;
+            }
+
+            const postedOrder =
+              a.createdAt.localeCompare(
+                b.createdAt,
+              );
+
+            if (postedOrder !== 0) {
+              return postedOrder;
+            }
+
+            return a.id.localeCompare(b.id);
+          });
 
       const openPlaces =
         databasePlaces.filter(
@@ -911,44 +1284,26 @@ export default function HomePosts() {
       setLoading(false);
     }
 
+    setGreeting(getGreeting());
+    void loadUser();
     void loadContent();
   }, []);
 
   return (
     <section className="bg-slate-50 py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          className="mb-8"
-          initial={{
-            opacity: 0,
-            y: 24,
-          }}
-          whileInView={{
-            opacity: 1,
-            y: 0,
-          }}
-          viewport={{
-            once: true,
-            amount: 0.4,
-          }}
-          transition={{
-            duration: 0.55,
-            ease: [
-              0.22,
-              1,
-              0.36,
-              1,
-            ],
-          }}
-        >
+        <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">
             Discover
           </p>
 
           <h2 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
-            Good morning, Ethan 👋
+            {greeting}
+            {firstName
+              ? `, ${firstName}.`
+              : "."}
           </h2>
-        </motion.div>
+        </div>
 
         {loading && (
           <div className="flex min-h-64 items-center justify-center">
@@ -1027,45 +1382,64 @@ export default function HomePosts() {
                   >
                     {item.kind ===
                     "post" ? (
-                      <Post
-                        category={
-                          item.post
-                            .category
-                        }
-                        colour={
-                          item.post
-                            .colour
-                        }
-                        title={
-                          item.post
-                            .title
-                        }
-                        description={
-                          item.post
-                            .description
-                        }
-                        href={
-                          item.post.href
-                        }
-                        date={
-                          item.post.date
-                        }
-                        dates={
-                          item.post.dates
-                        }
-                        postedBy={
-                          item.post
-                            .postedBy
-                        }
-                        location={
-                          item.post
-                            .location
-                        }
-                        featured={
-                          item.post
-                            .featured
-                        }
-                      />
+                      <AnalyticsPostWrapper
+                        postId={item.post.id}
+                      >
+                        <Post
+                          category={
+                            item.post
+                              .category
+                          }
+                          colour={
+                            item.post
+                              .colour
+                          }
+                          type={
+                            item.post.type
+                          }
+                          brandColour={
+                            item.post
+                              .brandColour
+                          }
+                          metadata={
+                            item.post
+                              .metadata
+                          }
+                          title={
+                            item.post
+                              .title
+                          }
+                          description={
+                            item.post
+                              .description
+                          }
+                          href={
+                            item.post.href
+                          }
+                          date={
+                            item.post.date
+                          }
+                          dates={
+                            item.post.dates
+                          }
+                          postedBy={
+                            item.post
+                              .postedBy
+                          }
+                          location={
+                            item.post
+                              .location
+                          }
+                          featured={
+                            item.post
+                              .featured
+                          }
+                          isLocalPartner={
+                            item.post
+                              .isLocalPartner
+                          }
+                        />
+                      </AnalyticsPostWrapper>
                     ) : (
                       <PlacePost
                         id={
@@ -1104,8 +1478,11 @@ export default function HomePosts() {
                             .opening_hours as any
                         }
                         is_24_7={
-                          item.place
-                            .is_24_7
+                          isTrue(
+                            item.place
+                              .metadata
+                              ?.open_24_7,
+                          )
                         }
                         slug={
                           item.place
