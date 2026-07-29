@@ -1348,30 +1348,53 @@ export default function HomePosts() {
                 (item) => (
                   <motion.div
                     key={item.key}
-                    initial={{
-                      opacity: 0,
-                      y: 28,
-                      scale: 0.99,
-                    }}
-                    whileInView={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                    }}
-                    viewport={{
-                      once: true,
-                      amount: 0.15,
-                      margin:
-                        "0px 0px -80px 0px",
-                    }}
+                    initial={
+                      item.animationIndex === 0
+                        ? false
+                        : {
+                            opacity: 0,
+                            y: 28,
+                            scale: 0.99,
+                          }
+                    }
+                    animate={
+                      item.animationIndex === 0
+                        ? {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                          }
+                        : undefined
+                    }
+                    whileInView={
+                      item.animationIndex === 0
+                        ? undefined
+                        : {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                          }
+                    }
+                    viewport={
+                      item.animationIndex === 0
+                        ? undefined
+                        : {
+                            once: true,
+                            amount: 0.15,
+                            margin:
+                              "0px 0px -80px 0px",
+                          }
+                    }
                     transition={{
                       duration: 0.5,
                       delay:
-                        Math.min(
-                          item.animationIndex %
-                            3,
-                          2,
-                        ) * 0.04,
+                        item.animationIndex === 0
+                          ? 0
+                          : Math.min(
+                              item.animationIndex %
+                                3,
+                              2,
+                            ) * 0.04,
                       ease: [
                         0.22,
                         1,

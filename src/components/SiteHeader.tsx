@@ -95,7 +95,7 @@ export default function SiteHeader() {
           />
 
           <span className="text-lg font-black tracking-tight text-slate-900 sm:hidden">
-            ELO
+            East Lothian Online
           </span>
 
           <div className="hidden leading-tight sm:block">
