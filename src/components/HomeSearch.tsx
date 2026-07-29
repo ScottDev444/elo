@@ -1105,7 +1105,7 @@ export default function HomeSearch() {
           onFocus={() => setIsFocused(true)}
           aria-label="Search East Lothian Online"
           placeholder="Search East Lothian..."
-          className="ml-3 w-full bg-transparent text-sm text-white outline-none placeholder:text-white/60"
+          className="ml-3 w-full bg-transparent text-[16px] text-white outline-none placeholder:text-white/60 sm:text-sm"
           autoComplete="off"
           spellCheck={false}
         />

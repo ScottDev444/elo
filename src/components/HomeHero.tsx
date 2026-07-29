@@ -81,17 +81,17 @@ export default function HomeHero() {
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/10 via-emerald-700/20 to-emerald-900/30" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[72vh] w-full max-w-6xl min-w-0 items-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div className="relative z-10 mx-auto flex min-h-[52vh] w-full max-w-6xl min-w-0 items-center px-4 py-10 sm:min-h-[68vh] sm:px-6 sm:py-20 lg:min-h-[72vh] lg:px-8">
         <div className="w-full min-w-0 text-center">
           <h1 className="mx-auto max-w-5xl text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
             East Lothian Online
           </h1>
 
-          <div className="relative z-50 mx-auto mt-8 w-full min-w-0 max-w-2xl sm:mt-10">
+          <div className="relative z-50 mx-auto mt-6 w-full min-w-0 max-w-2xl sm:mt-10">
             <HomeSearch />
           </div>
 
-          <div className="relative z-10 mx-auto mt-7 flex w-full min-w-0 flex-wrap items-start justify-center gap-3 sm:gap-6">
+          <div className="relative z-10 mx-auto mt-5 flex w-full min-w-0 flex-wrap items-start justify-center gap-2.5 sm:mt-7 sm:gap-6">
             {quickActions.map((action) => {
               const Icon = action.icon;
 
@@ -99,14 +99,14 @@ export default function HomeHero() {
                 <Link
                   key={action.label}
                   href={action.href}
-                  className="group/action flex w-16 shrink-0 flex-col items-center gap-2"
+                  className="group/action flex w-16 shrink-0 flex-col items-center gap-1.5 sm:gap-2"
                   aria-label={action.label}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white shadow-md shadow-emerald-950/10 backdrop-blur-xl transition-all duration-300 group-hover/action:-translate-y-0.5 group-hover/action:border-white/60 group-hover/action:bg-white/25 sm:h-12 sm:w-12">
-                    <Icon className="h-5 w-5" />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white shadow-md shadow-emerald-950/10 backdrop-blur-xl transition-all duration-300 group-hover/action:-translate-y-0.5 group-hover/action:border-white/60 group-hover/action:bg-white/25 sm:h-12 sm:w-12">
+                    <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                   </span>
 
-                  <span className="text-[11px] font-medium text-white/80 transition group-hover/action:text-white">
+                  <span className="text-[10px] font-medium text-white/80 transition group-hover/action:text-white sm:text-[11px]">
                     {action.label}
                   </span>
                 </Link>

@@ -84,7 +84,7 @@ export default function SiteHeader() {
         <Link
           href="/"
           className="flex items-center gap-3"
-          aria-label="Home"
+          aria-label="Go to homepage"
         >
           <Image
             src="/logo-new.png"
@@ -93,6 +93,10 @@ export default function SiteHeader() {
             height={44}
             className="h-11 w-11 rounded-xl object-contain"
           />
+
+          <span className="text-lg font-black tracking-tight text-slate-900 sm:hidden">
+            ELO
+          </span>
 
           <div className="hidden leading-tight sm:block">
             <p className="text-base font-bold text-slate-900">

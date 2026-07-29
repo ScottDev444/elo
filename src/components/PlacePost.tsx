@@ -41,11 +41,76 @@ const dayNames = [
   "thursday",
   "friday",
   "saturday",
-];
+] as const;
+
+function parseTime(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function getDayHours(
+  openingHours: OpeningHours,
+  dayName: string,
+) {
+  const directMatch = openingHours[dayName];
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const matchingKey = Object.keys(
+    openingHours,
+  ).find(
+    (key) =>
+      key.toLowerCase() ===
+      dayName.toLowerCase(),
+  );
+
+  return matchingKey
+    ? openingHours[matchingKey]
+    : undefined;
+}
+
+function formatHoursLabel(
+  open?: string,
+  close?: string,
+) {
+  if (!open || !close) {
+    return "Hours unavailable";
+  }
+
+  return `${open} – ${close}`;
+}
 
 function getTodayHours(
   openingHours?: OpeningHours | null,
   isTwentyFourSeven?: boolean | null,
+  now = new Date(),
 ) {
   if (isTwentyFourSeven === true) {
     return {
@@ -63,29 +128,125 @@ function getTodayHours(
     };
   }
 
-  const today = dayNames[new Date().getDay()];
-  const hours = openingHours[today];
+  const currentDayIndex = now.getDay();
+  const previousDayIndex =
+    (currentDayIndex + 6) % 7;
 
-  if (!hours || hours.closed) {
+  const currentDayName =
+    dayNames[currentDayIndex];
+
+  const previousDayName =
+    dayNames[previousDayIndex];
+
+  const currentMinutes =
+    now.getHours() * 60 +
+    now.getMinutes();
+
+  const todayHours = getDayHours(
+    openingHours,
+    currentDayName,
+  );
+
+  let isOpen = false;
+
+  if (
+    todayHours &&
+    !todayHours.closed
+  ) {
+    const openMinutes = parseTime(
+      todayHours.open,
+    );
+
+    const closeMinutes = parseTime(
+      todayHours.close,
+    );
+
+    if (
+      openMinutes !== null &&
+      closeMinutes !== null
+    ) {
+      if (openMinutes === closeMinutes) {
+        isOpen = true;
+      } else if (
+        closeMinutes > openMinutes
+      ) {
+        isOpen =
+          currentMinutes >= openMinutes &&
+          currentMinutes < closeMinutes;
+      } else {
+        isOpen =
+          currentMinutes >= openMinutes;
+      }
+    }
+  }
+
+  if (!isOpen) {
+    const previousHours = getDayHours(
+      openingHours,
+      previousDayName,
+    );
+
+    if (
+      previousHours &&
+      !previousHours.closed
+    ) {
+      const previousOpenMinutes =
+        parseTime(previousHours.open);
+
+      const previousCloseMinutes =
+        parseTime(previousHours.close);
+
+      const crossesMidnight =
+        previousOpenMinutes !== null &&
+        previousCloseMinutes !== null &&
+        previousCloseMinutes <
+          previousOpenMinutes;
+
+      if (
+        crossesMidnight &&
+        currentMinutes <
+          previousCloseMinutes
+      ) {
+        isOpen = true;
+      }
+    }
+  }
+
+  if (
+    !todayHours ||
+    todayHours.closed
+  ) {
     return {
       label: "Closed today",
-      statusLabel: "Closed Today",
-      isOpen: false,
+      statusLabel: isOpen
+        ? "Open Now"
+        : "Closed Today",
+      isOpen,
     };
   }
 
-  if (!hours.open || !hours.close) {
+  if (
+    !todayHours.open ||
+    !todayHours.close
+  ) {
     return {
       label: "Hours unavailable",
-      statusLabel: "Hours unavailable",
-      isOpen: false,
+      statusLabel: isOpen
+        ? "Open Now"
+        : "Hours unavailable",
+      isOpen,
     };
   }
 
   return {
-    label: `${hours.open} – ${hours.close}`,
-    statusLabel: "Open Now",
-    isOpen: true,
+    label: formatHoursLabel(
+      todayHours.open,
+      todayHours.close,
+    ),
+    statusLabel: isOpen
+      ? "Open Now"
+      : "Closed Now",
+    isOpen,
   };
 }
 
@@ -115,9 +276,23 @@ export default function PlacePost({
   const [imageIndex, setImageIndex] =
     useState(0);
 
+  const [now, setNow] = useState(
+    () => new Date(),
+  );
+
   useEffect(() => {
     setImageIndex(0);
   }, [usableImages]);
+
+  useEffect(() => {
+    const interval =
+      window.setInterval(() => {
+        setNow(new Date());
+      }, 60_000);
+
+    return () =>
+      window.clearInterval(interval);
+  }, []);
 
   const image =
     usableImages[imageIndex];
@@ -125,6 +300,7 @@ export default function PlacePost({
   const todayHours = getTodayHours(
     opening_hours,
     is_24_7,
+    now,
   );
 
   const href = slug

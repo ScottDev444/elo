@@ -716,7 +716,7 @@ export default function CreatePostPage() {
             <section className="border-t border-black/10 pt-8">
               <h2 className="text-xl font-black">Dates</h2>
 
-              <div className="mt-5 rounded-3xl bg-black/[0.035] p-4 sm:p-5">
+              <div className="-mx-5 mt-5 bg-black/[0.035] px-2 py-5 sm:mx-0 sm:rounded-3xl sm:p-5">
                 <div className="flex items-center justify-between gap-4">
                   <button
                     type="button"
@@ -749,7 +749,7 @@ export default function CreatePostPage() {
                   <span>Sun</span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-2">
+                <div className="mt-3 grid grid-cols-7 gap-1.5 sm:gap-2">
                   {calendarDays.map((date) => {
                     const key = dateKey(date);
                     const isCurrentMonth =
@@ -764,7 +764,7 @@ export default function CreatePostPage() {
                         onClick={() => toggleDate(date)}
                         disabled={isPast}
                         className={[
-                          "flex aspect-square items-center justify-center rounded-xl text-xs font-black transition sm:rounded-2xl sm:text-sm",
+                          "flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-black transition sm:aspect-square sm:min-h-0 sm:rounded-2xl",
                           isSelected
                             ? "bg-emerald-700 text-white"
                             : "bg-white hover:bg-emerald-50",
@@ -874,10 +874,10 @@ export default function CreatePostPage() {
             </p>
           ) : null}
 
-          <section className="flex flex-col-reverse gap-3 border-t border-black/10 pt-8 sm:flex-row">
+          <section className="flex flex-col-reverse items-stretch gap-3 border-t border-black/10 pt-8 sm:flex-row sm:items-center">
             <Link
               href="/account"
-              className="inline-flex h-14 items-center justify-center rounded-2xl border border-black/15 px-6 text-sm font-black uppercase tracking-[0.12em] transition hover:bg-black/[0.03]"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/15 px-4 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-black/[0.03] sm:w-auto"
             >
               Cancel
             </Link>
@@ -886,7 +886,7 @@ export default function CreatePostPage() {
               type="button"
               onClick={() => void createPost()}
               disabled={saving || loadingPages || pages.length === 0}
-              className="inline-flex h-14 flex-1 items-center justify-center gap-3 rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-16 flex-1 items-center justify-center gap-3 rounded-2xl bg-emerald-700 px-8 text-base font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? (
                 <LoaderCircle className="h-5 w-5 animate-spin" />
