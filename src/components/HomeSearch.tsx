@@ -396,7 +396,7 @@ function getResultKey(result: SearchResult) {
 
 function getResultHref(result: SearchResult) {
   if (result.kind === "group") {
-    return `/page/${result.group.slug ?? result.group.id}`;
+    return `/pages/${result.group.id}`;
   }
 
   if (result.kind === "place") {
@@ -971,7 +971,7 @@ export default function HomeSearch() {
 
   const dropdown =
     showDropdown ? (
-      <div className="absolute inset-x-0 top-full z-50 mt-2 max-h-[min(34rem,65vh)] overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30">
+      <div className="relative z-[100] mt-2 max-h-[min(34rem,65vh)] w-full overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30">
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-neutral-500">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -1026,7 +1026,7 @@ export default function HomeSearch() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full"
+      className="relative z-[100] w-full"
     >
       <div className="group relative isolate flex h-11 items-center overflow-hidden rounded-full border border-white/40 px-5 shadow-lg shadow-emerald-950/10 transition-all duration-300 focus-within:border-white/70 focus-within:shadow-xl focus-within:shadow-emerald-950/20">
         <span

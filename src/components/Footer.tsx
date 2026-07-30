@@ -280,7 +280,7 @@ Atlas — The World in Your Pocket.
               </Link>
 
               <Link
-                href="/partnership"
+                href="/local-partnership"
                 className="block text-sm text-white/65 transition hover:translate-x-1 hover:text-white"
               >
                 Local Partnership
