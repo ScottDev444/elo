@@ -1,11 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -530,7 +528,6 @@ export default function HomeSearch() {
   const supabase = useMemo(() => createClient(), []);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const logTimerRef = useRef<
     ReturnType<typeof setTimeout> | undefined
@@ -546,12 +543,6 @@ export default function HomeSearch() {
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [dropdownStyle, setDropdownStyle] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
-
   const [error, setError] = useState<string | null>(
     null,
   );
@@ -916,8 +907,7 @@ export default function HomeSearch() {
       const target = event.target as Node;
 
       const clickedInsideSearch =
-        containerRef.current?.contains(target) ||
-        dropdownRef.current?.contains(target);
+        containerRef.current?.contains(target);
 
       if (!clickedInsideSearch) {
         recordAbandonedSearch();
@@ -979,105 +969,59 @@ export default function HomeSearch() {
   const showDropdown =
     isFocused && query.trim().length > 0;
 
-  useLayoutEffect(() => {
-    if (!showDropdown) {
-      setDropdownStyle(null);
-      return;
-    }
-
-    function updateDropdownPosition() {
-      const element = containerRef.current;
-
-      if (!element) {
-        return;
-      }
-
-      const rect = element.getBoundingClientRect();
-
-      setDropdownStyle({
-        top: rect.bottom + 12,
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-
-    updateDropdownPosition();
-
-    window.addEventListener("resize", updateDropdownPosition);
-    window.addEventListener("scroll", updateDropdownPosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updateDropdownPosition);
-      window.removeEventListener("scroll", updateDropdownPosition, true);
-    };
-  }, [showDropdown]);
-
   const dropdown =
-    showDropdown && dropdownStyle && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            ref={dropdownRef}
-            style={{
-              position: "fixed",
-              top: dropdownStyle.top,
-              left: dropdownStyle.left,
-              width: dropdownStyle.width,
-              zIndex: 2147483647,
-            }}
-            className="max-h-[min(34rem,65vh)] overflow-y-auto rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30"
-          >
-            {isLoading ? (
-              <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-neutral-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading…
-              </div>
-            ) : error ? (
-              <div className="px-5 py-10 text-center">
-                <p className="text-sm font-semibold text-red-600">
-                  {error}
-                </p>
-              </div>
-            ) : totalResults === 0 ? (
-              <div className="px-5 py-10 text-center">
-                <Search className="mx-auto h-5 w-5 text-neutral-400" />
+    showDropdown ? (
+      <div className="absolute inset-x-0 top-full z-50 mt-2 max-h-[min(34rem,65vh)] overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-white p-2 text-left shadow-2xl shadow-emerald-950/30">
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-neutral-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading…
+          </div>
+        ) : error ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm font-semibold text-red-600">
+              {error}
+            </p>
+          </div>
+        ) : totalResults === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <Search className="mx-auto h-5 w-5 text-neutral-400" />
 
-                <p className="mt-3 text-sm font-semibold text-neutral-900">
-                  Nothing found
-                </p>
+            <p className="mt-3 text-sm font-semibold text-neutral-900">
+              Nothing found
+            </p>
 
-                <p className="mt-1 text-xs text-neutral-500">
-                  Try another place, event or page.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {sections.map((section) => (
-                  <section key={section.id}>
-                    <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-emerald-600">
-                      <SectionIcon sectionId={section.id} />
+            <p className="mt-1 text-xs text-neutral-500">
+              Try another place, event or page.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sections.map((section) => (
+              <section key={section.id}>
+                <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-emerald-600">
+                  <SectionIcon sectionId={section.id} />
 
-                      <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">
-                        {section.title}
-                      </h2>
-                    </div>
+                  <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+                    {section.title}
+                  </h2>
+                </div>
 
-                    <div>
-                      {section.results.map((result) => (
-                        <SearchResultItem
-                          key={getResultKey(result)}
-                          result={result}
-                          onSelect={handleResultSelect}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
-          </div>,
-          document.body,
-        )
-      : null;
+                <div>
+                  {section.results.map((result) => (
+                    <SearchResultItem
+                      key={getResultKey(result)}
+                      result={result}
+                      onSelect={handleResultSelect}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null;
 
   return (
     <div

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   ArrowRight,
   Building2,
@@ -559,13 +558,6 @@ export default function PlacesPage() {
                       </p>
                     </div>
 
-                    <Link
-                      href="/create"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-emerald-950 transition hover:bg-emerald-100"
-                    >
-                      Add yours
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
                   </div>
                 </div>
               </div>
