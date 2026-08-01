@@ -21,7 +21,7 @@ export default function NotFound() {
         </p>
 
         <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-          Page not found
+          Sorry, The page you are looking for cannot be found.
         </h1>
 
         <p className="mx-auto mt-4 max-w-md text-base leading-7 text-emerald-50/85 sm:text-lg">
