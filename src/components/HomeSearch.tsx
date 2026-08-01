@@ -396,7 +396,7 @@ function getResultKey(result: SearchResult) {
 
 function getResultHref(result: SearchResult) {
   if (result.kind === "group") {
-    return `/pages/${result.group.id}`;
+    return `/pages/${result.group.slug ?? result.group.id}`;
   }
 
   if (result.kind === "place") {

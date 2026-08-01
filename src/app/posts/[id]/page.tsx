@@ -145,7 +145,7 @@ export default async function PostPage({ params }: PostPageProps) {
   }
 
   const pageName = post.groups?.name ?? "Atlas";
-  const pageHref = "/";
+  const pageHref = post.groups?.slug ? `/pages/${post.groups.slug}` : "/";
   const brandColor = safeBrandColor(post.groups?.brand_color);
   const typeLabel = getTypeLabel(post.type);
   const location = post.metadata?.location;
@@ -254,7 +254,13 @@ export default async function PostPage({ params }: PostPageProps) {
 
               {post.content && (
                 <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-                  Posted by {pageName}
+                  Posted by{" "}
+                  <Link
+                    href={pageHref}
+                    className="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-emerald-700"
+                  >
+                    {pageName}
+                  </Link>
                 </p>
               )}
             </div>
