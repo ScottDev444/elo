@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 type DealMetadata = {
-  deal_kind?: "price" | "percent" | "buy_x_get_y" | "free" | string | null;
+  deal_kind?: "price" | "percent" | "buy_x_get_y" | "multibuy" | "free" | string | null;
   deal_price?: number | null;
   discount_percent?: number | null;
   buy_quantity?: number | null;
@@ -304,6 +304,7 @@ function getDealValue(metadata?: DealMetadata | null) {
         : "Discount";
 
     case "buy_x_get_y":
+    case "multibuy":
       if (
         typeof metadata.buy_quantity === "number" &&
         typeof metadata.pay_quantity === "number"
@@ -716,100 +717,117 @@ export default function Post({
 
   if (isDeal) {
     const dealValue = getDealValue(metadata);
+    const isMultibuy =
+      metadata?.deal_kind === "multibuy" ||
+      metadata?.deal_kind === "buy_x_get_y";
 
     return (
       <>
         <Link
-        href={href}
-        className={`group block transition-all duration-300 hover:-translate-y-1 ${
-          featured ? "drop-shadow-xl" : ""
-        }`}
-      >
-        <article
-          className="relative overflow-hidden rounded-[1.75rem] shadow-sm transition-shadow duration-300 group-hover:shadow-xl"
-          style={{
-            backgroundColor: resolvedBrandColour,
-            color: brandTextColour,
-          }}
+          href={href}
+          className={`group block transition-all duration-300 hover:-translate-y-1 ${
+            featured ? "drop-shadow-xl" : ""
+          }`}
         >
-          <div
-            className="absolute right-0 top-1/2 h-12 w-12 -translate-y-1/2 translate-x-6 rounded-full"
-            style={{ backgroundColor: "#f8fafc" }}
-          />
-
-          <div className="grid min-h-[12rem] grid-cols-[7.5rem_minmax(0,1fr)] sm:min-h-[10.5rem] sm:grid-cols-[10rem_minmax(0,1fr)]">
-            <div className="flex items-center justify-center border-r border-white/20 p-4 text-center">
-              <div>
-                <Tag className="mx-auto h-5 w-5" />
-
-                <p className="mt-2 text-[0.65rem] font-black uppercase tracking-[0.2em] opacity-75">
-                  Deal
-                </p>
-
-                <p className="mt-1 break-words text-2xl font-black leading-none tracking-tight sm:text-3xl">
-                  {dealValue}
-                </p>
-              </div>
-            </div>
+          <article
+            className="relative overflow-hidden rounded-3xl shadow-lg transition-shadow duration-300 group-hover:shadow-xl"
+            style={{
+              backgroundColor: resolvedBrandColour,
+              color: brandTextColour,
+            }}
+          >
+            <div className="absolute left-[7.25rem] top-0 h-full border-l-2 border-dashed border-current opacity-20 sm:left-[9rem]" />
 
             <div
-              className="flex min-w-0 flex-col justify-center px-6 py-5 pr-10"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {isLocalPartner && (
-                    <LocalPartnerBadge onClick={openPartnerInfo} />
-                  )}
-                  {dateTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold backdrop-blur-sm"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+              className="absolute -left-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full"
+              style={{ backgroundColor: "#ffffff" }}
+            />
+            <div
+              className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full"
+              style={{ backgroundColor: "#ffffff" }}
+            />
 
-                <ArrowRight className="h-5 w-5 shrink-0 opacity-70 transition duration-300 group-hover:translate-x-1 group-hover:opacity-100" />
+            <div className="grid min-h-[12rem] grid-cols-[7.25rem_minmax(0,1fr)] sm:grid-cols-[9rem_minmax(0,1fr)]">
+              <div className="flex items-center justify-center px-3 py-5 text-center">
+                <div className="w-full">
+                  <p className="text-[0.58rem] font-black uppercase tracking-[0.22em] opacity-65">
+                    Deal
+                  </p>
+
+                  {isMultibuy ? (
+                    <div className="mt-3">
+                      <p className="text-5xl font-black leading-[0.78] tracking-[-0.08em] sm:text-6xl">
+                        {metadata?.buy_quantity}
+                      </p>
+                      <p className="my-2 text-[0.65rem] font-black uppercase tracking-[0.22em] opacity-70">
+                        for
+                      </p>
+                      <p className="text-5xl font-black leading-[0.78] tracking-[-0.08em] sm:text-6xl">
+                        {metadata?.pay_quantity}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 break-words text-3xl font-black leading-[0.9] tracking-[-0.06em] sm:text-4xl">
+                      {dealValue}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <h2 className="mt-3 line-clamp-2 text-xl font-black tracking-tight sm:text-2xl">
-                {title}
-              </h2>
+              <div className="flex min-w-0 flex-col justify-center px-5 py-5 sm:px-7 sm:py-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  {isLocalPartner ? (
+                    <LocalPartnerBadge
+                      onClick={openPartnerInfo}
+                    />
+                  ) : null}
 
-              {description && (
-                <p className="mt-2 line-clamp-2 text-sm leading-6 opacity-80 sm:text-base">
-                  {description}
-                </p>
-              )}
-
-              {(postedBy || location || displayDate) && (
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold opacity-80 sm:text-sm">
-                  {displayDate && (
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays className="h-4 w-4 shrink-0" />
-                      {formatDateKey(displayDate)}
-                    </span>
-                  )}
-
-                  {postedBy && (
-                    <span className="flex items-center gap-1.5">
-                      <UserRound className="h-4 w-4 shrink-0" />
-                      {postedBy}
-                    </span>
-                  )}
-
-                  {location && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 shrink-0" />
-                      {location}
-                    </span>
-                  )}
+                  {dateTags
+                    .filter((tag) => !tag.endsWith(" Dates"))
+                    .map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-current/20 bg-white/10 px-3 py-1 text-xs font-bold"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                 </div>
-              )}
+
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  <h2 className="line-clamp-2 text-xl font-black tracking-[-0.035em] sm:text-2xl">
+                    {title}
+                  </h2>
+
+                  <ArrowUpRight className="mt-1 h-5 w-5 shrink-0 opacity-60 transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </div>
+
+                {description ? (
+                  <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 opacity-70">
+                    {description}
+                  </p>
+                ) : null}
+
+                {postedBy || location ? (
+                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold opacity-65 sm:text-sm">
+                    {postedBy ? (
+                      <span className="flex items-center gap-1.5">
+                        <UserRound className="h-4 w-4 shrink-0" />
+                        {postedBy}
+                      </span>
+                    ) : null}
+
+                    {location ? (
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 shrink-0" />
+                        {location}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </article>
+          </article>
         </Link>
         {partnerPopup}
       </>
