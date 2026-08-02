@@ -529,7 +529,12 @@ export default function CreatePostPage() {
         popup_start_time: type === "popup" ? popupStartTime : null,
         popup_end_time: type === "popup" ? popupEndTime : null,
         advert_cta: type === "advert" ? advertCta : null,
-        advert_url: type === "advert" ? advertUrl.trim() : null,
+        advert_url:
+          type === "advert"
+            ? /^https?:\/\//i.test(advertUrl.trim())
+              ? advertUrl.trim()
+              : `https://${advertUrl.trim()}`
+            : null,
       };
 
       const { data: createdPost, error: insertError } = await supabase
@@ -904,7 +909,7 @@ export default function CreatePostPage() {
                 placeholder="Where is the Pop-Up?"
                 className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
               />
-              <div className="mt-5 grid grid-cols-2 gap-4">
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-black">Starts</label>
                   <input type="time" step="3600" value={popupStartTime} onChange={(event) => setPopupStartTime(event.target.value)}
@@ -1119,11 +1124,15 @@ export default function CreatePostPage() {
             <section className="border-t border-black/10 pt-8">
               <h2 className="text-xl font-black">{type === "advert" ? "Banner image" : "Image"}</h2>
               {type === "advert" ? (
-                <p className="mt-2 text-sm leading-6 text-black/50">Choose a wide banner image for the advert.</p>
+                <p className="mt-2 text-sm leading-6 text-black/50">
+                  Use a wide 4:1 banner. Recommended 1200 × 300px. Minimum 800 × 200px. Maximum 2400 × 600px.
+                </p>
               ) : null}
               <label className={[
-                "relative mt-5 flex cursor-pointer items-center justify-center overflow-hidden rounded-3xl border border-black/10 bg-black/[0.03]",
-                type === "advert" ? "aspect-[4/1]" : "aspect-[16/10]",
+                "relative mt-5 flex cursor-pointer items-center justify-center overflow-hidden border border-black/10 bg-black/[0.03]",
+                type === "advert"
+                  ? "aspect-[4/1]"
+                  : "aspect-[16/10] rounded-3xl",
               ].join(" ")}>
                 <input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} className="hidden" />
                 {displayedImage ? (
