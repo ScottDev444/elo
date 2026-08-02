@@ -18,6 +18,7 @@ import {
   PoundSterling,
   MapPin,
   Newspaper,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -700,16 +701,77 @@ export default function CreatePostPage() {
           </section>
 
           <section className="border-t border-black/10 pt-8">
-            <h2 className="text-xl font-black">Post type</h2>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-black/40">
+                  Format
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-[-0.03em]">
+                  What are you sharing?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-black/50">
+                  Choose the one that best fits what you want to share.
+                </p>
+              </div>
+              <Sparkles className="hidden h-6 w-6 text-emerald-700 sm:block" />
+            </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[
-                { value: "event", label: "Event", icon: CalendarDays, premium: false },
-                { value: "deal", label: "Deal", icon: PoundSterling, premium: false },
-                { value: "alert", label: "Alert", icon: AlertTriangle, premium: false },
-                { value: "update", label: "Update", icon: Newspaper, premium: true },
-                { value: "popup", label: "Pop-Up", icon: MapPin, premium: true },
-                { value: "advert", label: "Advert", icon: Megaphone, premium: true },
+                {
+                  value: "event",
+                  label: "Event",
+                  description: "Let people know what’s on and when it’s happening.",
+                  icon: CalendarDays,
+                  premium: false,
+                  activeClass: "border-blue-600 bg-blue-50 text-blue-950 ring-blue-100",
+                  iconClass: "bg-blue-600 text-white",
+                },
+                {
+                  value: "deal",
+                  label: "Deal",
+                  description: "Share a special offer, discount or something free.",
+                  icon: PoundSterling,
+                  premium: false,
+                  activeClass: "border-emerald-600 bg-emerald-50 text-emerald-950 ring-emerald-100",
+                  iconClass: "bg-emerald-600 text-white",
+                },
+                {
+                  value: "alert",
+                  label: "Alert",
+                  description: "Let people know about important changes today, like a closed kitchen, changed hours or something being sold out.",
+                  icon: AlertTriangle,
+                  premium: false,
+                  activeClass: "border-amber-500 bg-amber-50 text-amber-950 ring-amber-100",
+                  iconClass: "bg-amber-500 text-white",
+                },
+                {
+                  value: "update",
+                  label: "Update",
+                  description: "Got more to say? Share news, announcements or what you’ve been up to, with up to three images.",
+                  icon: Newspaper,
+                  premium: true,
+                  activeClass: "border-violet-600 bg-violet-50 text-violet-950 ring-violet-100",
+                  iconClass: "bg-violet-700 text-white",
+                },
+                {
+                  value: "popup",
+                  label: "Pop-Up",
+                  description: "Popping up somewhere today? Tell people where to find you and when you’ll be there.",
+                  icon: MapPin,
+                  premium: true,
+                  activeClass: "border-rose-600 bg-rose-50 text-rose-950 ring-rose-100",
+                  iconClass: "bg-rose-600 text-white",
+                },
+                {
+                  value: "advert",
+                  label: "Advert",
+                  description: "Promote your business with a banner that stays in the feed and links straight where you want people to go.",
+                  icon: Megaphone,
+                  premium: true,
+                  activeClass: "border-slate-800 bg-slate-50 text-slate-950 ring-slate-200",
+                  iconClass: "bg-slate-900 text-white",
+                },
               ].map((item) => {
                 const Icon = item.icon;
                 const active = type === item.value;
@@ -724,89 +786,237 @@ export default function CreatePostPage() {
                         setMessage("LOCAL_PARTNER_UPSELL");
                         return;
                       }
+
                       setMessage("");
                       setType(item.value as PostType);
                     }}
                     className={[
-                      "flex min-h-28 flex-col items-center justify-center rounded-2xl border p-4 text-center transition",
+                      "group relative flex min-h-32 items-start gap-4 rounded-3xl border p-5 text-left transition duration-200",
                       active
-                        ? "border-emerald-700 bg-emerald-700 text-white"
+                        ? `${item.activeClass} ring-4`
                         : locked
-                          ? "border-black/10 bg-black/[0.025] text-black/35"
-                          : "border-black/10 bg-white hover:border-black/25",
+                          ? "border-black/[0.08] bg-black/[0.025] text-black/40"
+                          : "border-black/10 bg-white hover:-translate-y-0.5 hover:border-black/20 hover:shadow-lg hover:shadow-black/[0.05]",
                     ].join(" ")}
                   >
-                    {locked ? <Lock className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
-                    <span className="mt-2 text-sm font-black">{item.label}</span>
-                    {item.premium ? (
-                      <span className="mt-1 text-[10px] font-black uppercase tracking-[0.1em]">
-                        {locked ? "Locked" : "Local Partner"}
-                      </span>
-                    ) : null}
+                    <div
+                      className={[
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm",
+                        locked
+                          ? "bg-black/[0.06] text-black/35"
+                          : item.iconClass,
+                      ].join(" ")}
+                    >
+                      {locked ? (
+                        <Lock className="h-5 w-5" />
+                      ) : (
+                        <Icon className="h-5 w-5" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-base font-black tracking-[-0.02em]">
+                          {item.label}
+                        </span>
+
+                        {active ? (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-current/10">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-1.5 text-sm font-medium leading-5 opacity-60">
+                        {item.description}
+                      </p>
+
+                      {item.premium ? (
+                        <span className="mt-3 inline-flex rounded-lg bg-black/[0.06] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                          {locked ? "Local Partner · Locked" : "Local Partner"}
+                        </span>
+                      ) : (
+                        <span className="mt-3 inline-flex text-[10px] font-black uppercase tracking-[0.12em] opacity-40">
+                          Available to everyone
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
             </div>
 
             {message === "LOCAL_PARTNER_UPSELL" && !hasPremiumPostingAccess ? (
-              <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-6">
-                <p className="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">
-                  Become a Local Partner
-                </p>
-                <h3 className="mt-2 text-2xl font-black tracking-[-0.03em] text-emerald-950">
-                  Unlock every post type for £9.99 a month.
-                </h3>
-                <p className="mt-3 leading-7 text-emerald-950/70">
-                  Post all post types without limits, see your analytics and local trends,
-                  and get pinned higher in the feed.
-                </p>
-                <Link
-                  href="/localpartner"
-                  className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 text-sm font-black uppercase tracking-[0.1em] text-white transition hover:bg-emerald-800"
-                >
-                  Become a Local Partner
-                </Link>
+              <div className="mt-5 overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+                <div className="p-6 sm:p-7">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                        Local Partner
+                      </p>
+                      <h3 className="mt-1 text-2xl font-black tracking-[-0.035em] text-emerald-950">
+                        Unlock every format.
+                      </h3>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 max-w-xl leading-7 text-emerald-950/65">
+                    For £9.99 a month you can use every post type without limits,
+                    access analytics and local trends, and receive higher feed priority.
+                  </p>
+
+                  <Link
+                    href="/localpartner"
+                    className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
+                  >
+                    Explore Local Partnership
+                  </Link>
+                </div>
               </div>
             ) : null}
           </section>
 
           {type !== "advert" ? (
-          <section className="border-t border-black/10 pt-8">
-            <label
-              htmlFor="post-title"
-              className="block text-sm font-black"
+            <section
+              className={[
+                "overflow-hidden rounded-[2rem] border shadow-sm",
+                type === "event"
+                  ? "border-blue-200 bg-gradient-to-b from-blue-50/80 to-white"
+                  : type === "deal"
+                    ? "border-emerald-200 bg-gradient-to-b from-emerald-50/80 to-white"
+                    : type === "alert"
+                      ? "border-amber-200 bg-gradient-to-b from-amber-50/90 to-white"
+                      : type === "update"
+                        ? "border-violet-200 bg-gradient-to-b from-violet-50/80 to-white"
+                        : "border-rose-200 bg-gradient-to-b from-rose-50/80 to-white",
+              ].join(" ")}
             >
-              Title
-            </label>
+              <div
+                className={[
+                  "border-b px-6 py-5 sm:px-8",
+                  type === "event"
+                    ? "border-blue-100"
+                    : type === "deal"
+                      ? "border-emerald-100"
+                      : type === "alert"
+                        ? "border-amber-100"
+                        : type === "update"
+                          ? "border-violet-100"
+                          : "border-rose-100",
+                ].join(" ")}
+              >
+                <p
+                  className={[
+                    "text-xs font-black uppercase tracking-[0.16em]",
+                    type === "event"
+                      ? "text-blue-700"
+                      : type === "deal"
+                        ? "text-emerald-700"
+                        : type === "alert"
+                          ? "text-amber-700"
+                          : type === "update"
+                            ? "text-violet-700"
+                            : "text-rose-700",
+                  ].join(" ")}
+                >
+                  {type === "event"
+                    ? "Event notice"
+                    : type === "deal"
+                      ? "Local offer"
+                      : type === "alert"
+                        ? "Important notice"
+                        : type === "update"
+                          ? "Long-form notice"
+                          : "Temporary place"}
+                </p>
 
-            <input
-              id="post-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={
-                type === "alert"
-                  ? "Closed today, roadworks, sold out..."
-                  : "What's happening?"
-              }
-              className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-            />
+                <h2 className="mt-1 text-2xl font-black tracking-[-0.035em] text-black">
+                  {type === "event"
+                    ? "Share an event"
+                    : type === "deal"
+                      ? "Share a deal"
+                      : type === "alert"
+                        ? "Post an alert"
+                        : type === "update"
+                          ? "Share an update"
+                          : "Create a Pop-Up"}
+                </h2>
 
-            <label
-              htmlFor="post-details"
-              className="mt-6 block text-sm font-black"
-            >
-              Details
-            </label>
+                <p className="mt-2 text-sm leading-6 text-black/50">
+                  {type === "event"
+                    ? "Tell people what’s happening, then choose the date or dates."
+                    : type === "deal"
+                      ? "Tell people about your offer, then add the price or discount."
+                      : type === "alert"
+                        ? "Use this for important changes today — like your kitchen being closed, closing early or something being sold out."
+                        : type === "update"
+                          ? "Share something worth talking about — news, announcements, progress or anything that needs a little more space."
+                          : "Tell people what you’re bringing, then add where and when they can find you."}
+                </p>
+              </div>
 
-            <textarea
-              id="post-details"
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              rows={7}
-              placeholder="Add the key details..."
-              className="mt-3 w-full resize-none rounded-2xl border border-black/15 px-5 py-4 font-semibold leading-7 outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-            />
-          </section>
+              <div className="p-6 sm:p-8">
+                <label htmlFor="post-title" className="block text-sm font-black">
+                  Title
+                </label>
+
+                <input
+                  id="post-title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder={
+                    type === "alert"
+                      ? "Kitchen closed today, closing early, sold out..."
+                      : type === "popup"
+                        ? "What's popping up?"
+                        : "What's happening?"
+                  }
+                  className={[
+                    "mt-3 h-14 w-full rounded-2xl border bg-white px-5 font-semibold outline-none transition",
+                    type === "event"
+                      ? "border-blue-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                      : type === "deal"
+                        ? "border-emerald-200 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                        : type === "alert"
+                          ? "border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                          : type === "update"
+                            ? "border-violet-200 focus:border-violet-600 focus:ring-4 focus:ring-violet-100"
+                            : "border-rose-200 focus:border-rose-600 focus:ring-4 focus:ring-rose-100",
+                  ].join(" ")}
+                />
+
+                <label htmlFor="post-details" className="mt-6 block text-sm font-black">
+                  Details
+                </label>
+
+                <textarea
+                  id="post-details"
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  rows={type === "update" ? 10 : 7}
+                  placeholder={
+                    type === "alert"
+                      ? "Explain what has changed and anything customers need to know..."
+                      : "Add the key details..."
+                  }
+                  className={[
+                    "mt-3 w-full resize-none rounded-2xl border bg-white px-5 py-4 font-semibold leading-7 outline-none transition",
+                    type === "event"
+                      ? "border-blue-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                      : type === "deal"
+                        ? "border-emerald-200 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                        : type === "alert"
+                          ? "border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                          : type === "update"
+                            ? "min-h-64 border-violet-200 focus:border-violet-600 focus:ring-4 focus:ring-violet-100"
+                            : "border-rose-200 focus:border-rose-600 focus:ring-4 focus:ring-rose-100",
+                  ].join(" ")}
+                />
+              </div>
+            </section>
           ) : null}
 
           {type === "deal" ? (
@@ -925,7 +1135,19 @@ export default function CreatePostPage() {
           ) : null}
 
           {type === "advert" ? (
-            <section className="border-t border-black/10 pt-8">
+            <section className="overflow-hidden rounded-[2rem] border border-slate-300 bg-gradient-to-b from-slate-100 to-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-5 sm:px-8">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-600">
+                  Evergreen promotion
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-[-0.035em] text-black">
+                  Build your advert
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-black/50">
+                  Upload your banner, choose a button and send people straight to your website, booking page or wherever you want.
+                </p>
+              </div>
+              <div className="p-6 sm:p-8">
               {existingAdvertId ? (
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
                   <h2 className="text-xl font-black text-emerald-950">
@@ -961,6 +1183,7 @@ export default function CreatePostPage() {
                 className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100" />
                 </>
               )}
+              </div>
             </section>
           ) : null}
 
