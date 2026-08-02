@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import {
   ArrowRight,
+  ArrowUpRight,
+  Clock3,
+  Navigation,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   BadgeCheck,
   MapPin,
   X,
@@ -20,6 +25,12 @@ type DealMetadata = {
   pay_quantity?: number | null;
   active_dates?: string[] | null;
   public_type?: string | null;
+  image_urls?: string[] | null;
+  popup_address?: string | null;
+  popup_start_time?: string | null;
+  popup_end_time?: string | null;
+  advert_cta?: string | null;
+  advert_url?: string | null;
 };
 
 type PostProps = {
@@ -34,10 +45,11 @@ type PostProps = {
 
   category?: string;
   colour?: "emerald" | "red" | "amber" | "blue";
-  type?: "event" | "deal" | "post";
+  type?: "event" | "deal" | "update" | "popup" | "advert" | "post";
 
   brandColour?: string;
   metadata?: DealMetadata | null;
+  imageUrl?: string | null;
 
   featured?: boolean;
   isLocalPartner?: boolean;
@@ -195,8 +207,13 @@ function getResolvedType(
     return type;
   }
 
-  if (metadata?.public_type === "deal") {
-    return "deal";
+  if (
+    metadata?.public_type === "deal" ||
+    metadata?.public_type === "update" ||
+    metadata?.public_type === "popup" ||
+    metadata?.public_type === "advert"
+  ) {
+    return metadata.public_type;
   }
 
   const normalisedCategory = category.trim().toLowerCase();
@@ -210,6 +227,26 @@ function getResolvedType(
   }
 
   return "post";
+}
+
+
+function getEloPostColour(seed: string) {
+  const palette = [
+    "#166534",
+    "#1d4ed8",
+    "#b45309",
+    "#be123c",
+    "#7e22ce",
+    "#0f766e",
+    "#c2410c",
+  ];
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index++) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return palette[hash % palette.length];
 }
 
 function safeBrandColour(colour?: string) {
@@ -322,10 +359,12 @@ export default function Post({
   type,
   brandColour,
   metadata,
+  imageUrl,
   featured = false,
   isLocalPartner = false,
 }: PostProps) {
   const [showPartnerInfo, setShowPartnerInfo] = useState(false);
+  const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
   const openPartnerInfo = (
     event: MouseEvent<HTMLSpanElement>,
@@ -399,13 +438,281 @@ export default function Post({
     metadata,
   );
 
-  const resolvedBrandColour = safeBrandColour(brandColour);
+  const isEloPost =
+    postedBy?.trim().toLowerCase() === "east lothian online";
+
+  const resolvedBrandColour = isEloPost
+    ? getEloPostColour(`${href}-${title}`)
+    : safeBrandColour(brandColour);
+
   const brandTextColour = getReadableTextColour(
     resolvedBrandColour,
   );
 
   const isDeal = resolvedType === "deal";
   const isEvent = resolvedType === "event";
+  const isUpdate = resolvedType === "update";
+  const isPopup = resolvedType === "popup";
+  const isAdvert = resolvedType === "advert";
+
+  if (isAdvert) {
+    return (
+      <>
+        <article className="border border-slate-200 bg-white shadow-sm">
+          {imageUrl ? (
+            <div className="flex w-full items-stretch">
+              <div className="relative min-w-0 flex-1">
+                <img
+                  src={imageUrl}
+                  alt={title}
+                  className="block h-full max-h-[180px] w-full object-cover sm:max-h-[220px]"
+                />
+
+                {isLocalPartner ? (
+                  <div className="absolute left-3 top-3 z-30">
+                    <LocalPartnerBadge onClick={openPartnerInfo} />
+                  </div>
+                ) : null}
+              </div>
+
+              {metadata?.advert_url ? (
+                <a
+                  href={metadata.advert_url}
+                  className="flex w-20 shrink-0 items-center justify-center px-2 text-center text-xs font-black uppercase tracking-[0.08em] transition hover:brightness-95 sm:w-28 sm:text-sm"
+                  style={{
+                    backgroundColor: resolvedBrandColour,
+                    color: brandTextColour,
+                  }}
+                >
+                  {metadata?.advert_cta || "LEARN MORE"}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </article>
+        {partnerPopup}
+      </>
+    );
+  }
+
+  if (isPopup) {
+    const popupAddress = metadata?.popup_address || location || "";
+    const popupHours =
+      metadata?.popup_start_time && metadata?.popup_end_time
+        ? `${metadata.popup_start_time} – ${metadata.popup_end_time}`
+        : "Hours unavailable";
+
+    const directionsQuery = encodeURIComponent(popupAddress);
+
+    return (
+      <>
+        <article className="group overflow-hidden rounded-[2rem] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:-translate-y-1">
+          <div
+            className="relative aspect-[16/10] overflow-hidden"
+            style={{ backgroundColor: resolvedBrandColour }}
+          >
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={title}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.045]"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <MapPin
+                  className="h-14 w-14"
+                  style={{ color: brandTextColour }}
+                />
+              </div>
+            )}
+
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
+
+            <div className="absolute left-4 top-4 flex items-center gap-2">
+              <span className="flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-white shadow-lg backdrop-blur-xl">
+                <span className="h-2 w-2 rounded-full bg-white" />
+                Open Today
+              </span>
+            </div>
+
+            <Link
+              href={href}
+              aria-label={`View ${title}`}
+              className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-white"
+            >
+              <ArrowUpRight className="h-5 w-5" />
+            </Link>
+
+            <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+              {popupAddress ? (
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
+                  <MapPin className="h-4 w-4" />
+                  <span>{popupAddress}</span>
+                </div>
+              ) : null}
+
+              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+                {title}
+              </h2>
+            </div>
+          </div>
+
+          <div className="p-5 sm:p-6">
+            {description ? (
+              <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+                {description}
+              </p>
+            ) : null}
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                  <Clock3 className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Today
+                  </p>
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {popupHours}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                  <MapPin className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Location
+                  </p>
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {popupAddress || "Location unavailable"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <Link
+                href={href}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+              >
+                View Pop-Up
+              </Link>
+
+              {directionsQuery ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${directionsQuery}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Get directions to ${title}`}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  <Navigation className="h-5 w-5" />
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </article>
+        {partnerPopup}
+      </>
+    );
+  }
+
+  if (isUpdate) {
+    const updateImages = Array.isArray(metadata?.image_urls)
+      ? metadata.image_urls.slice(0, 3)
+      : [];
+
+    return (
+      <>
+        <article
+          role="button"
+          tabIndex={0}
+          aria-expanded={showUpdateDetails}
+          onClick={() => setShowUpdateDetails((current) => !current)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setShowUpdateDetails((current) => !current);
+            }
+          }}
+          className="group relative cursor-pointer overflow-hidden rounded-[1.6rem] border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          style={{ borderColor: `${resolvedBrandColour}45` }}
+        >
+          <div
+            className="absolute left-0 top-0 h-full w-2"
+            style={{ backgroundColor: resolvedBrandColour }}
+          />
+
+          <div className="px-6 py-6 pl-8">
+            <div className="flex items-start justify-between gap-5">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900">
+                  {title}
+                </h2>
+                {postedBy ? (
+                  <p className="mt-2 text-sm font-bold" style={{ color: resolvedBrandColour }}>
+                    {postedBy}
+                  </p>
+                ) : null}
+              </div>
+
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition group-hover:scale-105"
+                style={{
+                  backgroundColor: `${resolvedBrandColour}12`,
+                  color: resolvedBrandColour,
+                }}
+              >
+                <ChevronDown
+                  className={`h-5 w-5 transition-transform duration-300 ${
+                    showUpdateDetails ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </div>
+
+            {!showUpdateDetails ? (
+              <p className="mt-5 text-sm font-semibold text-slate-400">
+                Tap to open notice
+              </p>
+            ) : (
+              <div className="mt-5 border-t border-dashed border-slate-200 pt-5">
+                {description ? (
+                  <p className="whitespace-pre-wrap text-[0.98rem] leading-7 text-black">
+                    {description}
+                  </p>
+                ) : null}
+
+                {updateImages.length > 0 ? (
+                  <div className="mt-6 space-y-3">
+                    {updateImages.map((image, index) => (
+                      <div
+                        key={`${image}-${index}`}
+                        className="overflow-hidden rounded-xl bg-slate-100"
+                      >
+                        <img
+                          src={image}
+                          alt={`${title} image ${index + 1}`}
+                          className="h-auto w-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </article>
+        {partnerPopup}
+      </>
+    );
+  }
 
   if (isDeal) {
     const dealValue = getDealValue(metadata);

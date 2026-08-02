@@ -5,25 +5,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  AlertTriangle,
-  ArrowLeft,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ImagePlus,
-  LoaderCircle,
-  Megaphone,
-  PoundSterling,
-  Trash2,
-  X,
+  AlertTriangle, ArrowLeft, CalendarDays, Check, ChevronLeft, ChevronRight,
+  ImagePlus, LoaderCircle, Megaphone, PoundSterling, Trash2, X, MapPin,
+  Newspaper,
 } from "lucide-react";
 
 import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
 
-type PostType = "event" | "deal" | "alert";
+type PostType = "event" | "deal" | "alert" | "update" | "popup" | "advert";
 type DealKind = "price" | "free" | "percent" | "multibuy";
 
 type PostMetadata = {
@@ -35,1013 +26,162 @@ type PostMetadata = {
   discount_percent?: number | null;
   buy_quantity?: number | null;
   pay_quantity?: number | null;
+  image_urls?: string[] | null;
+  popup_address?: string | null;
+  popup_start_time?: string | null;
+  popup_end_time?: string | null;
+  advert_cta?: string | null;
+  advert_url?: string | null;
   [key: string]: unknown;
 };
 
 type DatabasePost = {
-  id: string;
-  group_id: string;
-  title: string | null;
-  content: string | null;
-  type: string | null;
-  image_url: string | null;
-  event_start: string | null;
-  event_end: string | null;
-  expires_at: string | null;
-  metadata: PostMetadata | null;
+  id: string; group_id: string; title: string | null; content: string | null;
+  type: string | null; image_url: string | null; event_start: string | null;
+  event_end: string | null; expires_at: string | null; metadata: PostMetadata | null;
 };
 
-function normaliseDate(date: Date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function dateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function monthLabel(date: Date) {
-  return date.toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  });
-}
+function normaliseDate(date: Date) { const copy = new Date(date); copy.setHours(0,0,0,0); return copy; }
+function dateKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`; }
+function monthLabel(date: Date) { return date.toLocaleDateString("en-GB",{month:"long",year:"numeric"}); }
 
 function getPostType(post: DatabasePost): PostType {
-  const publicType = post.metadata?.public_type;
-
-  if (
-    publicType === "event" ||
-    publicType === "deal" ||
-    publicType === "alert"
-  ) {
-    return publicType;
-  }
-
-  if (post.type === "deal") {
-    return "deal";
-  }
-
-  if (post.type === "update" || post.type === "alert") {
-    return "alert";
-  }
-
-  return "event";
+  const t = (post.metadata?.public_type || post.type || "event").toLowerCase();
+  return ["event","deal","alert","update","popup","advert"].includes(t) ? t as PostType : "event";
 }
-
 function getSelectedDates(post: DatabasePost) {
-  const activeDates = post.metadata?.active_dates;
-
-  if (Array.isArray(activeDates)) {
-    return activeDates
-      .filter((date): date is string => typeof date === "string")
-      .sort();
-  }
-
-  return [post.event_start, post.event_end]
-    .filter((date): date is string => typeof date === "string")
-    .filter((date, index, dates) => dates.indexOf(date) === index)
-    .sort();
+  const dates = post.metadata?.active_dates;
+  if (Array.isArray(dates)) return dates.filter((d): d is string => typeof d === "string").sort();
+  return [post.event_start,post.event_end].filter((d): d is string => typeof d === "string").filter((d,i,a)=>a.indexOf(d)===i).sort();
 }
-
 function getDealKind(metadata: PostMetadata | null): DealKind {
-  const kind = metadata?.deal_kind;
-
-  if (
-    kind === "price" ||
-    kind === "free" ||
-    kind === "percent" ||
-    kind === "multibuy"
-  ) {
-    return kind;
-  }
-
-  return "price";
+  const k=metadata?.deal_kind; return ["price","free","percent","multibuy"].includes(k || "") ? k as DealKind : "price";
 }
 
 export default function EditPostPage() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const postId = params.id;
+  const params=useParams<{id:string}>(); const router=useRouter(); const postId=params.id;
+  const [groupId,setGroupId]=useState(""); const [type,setType]=useState<PostType>("event");
+  const [title,setTitle]=useState(""); const [body,setBody]=useState("");
+  const [selectedDates,setSelectedDates]=useState<string[]>([]);
+  const [monthDate,setMonthDate]=useState(()=>normaliseDate(new Date()));
+  const [existingImageUrl,setExistingImageUrl]=useState<string|null>(null);
+  const [removeExistingImage,setRemoveExistingImage]=useState(false);
+  const [imageFile,setImageFile]=useState<File|null>(null); const [imagePreview,setImagePreview]=useState("");
+  const [existingUpdateImages,setExistingUpdateImages]=useState<string[]>([]);
+  const [updateImages,setUpdateImages]=useState<File[]>([]); const [updatePreviews,setUpdatePreviews]=useState<string[]>([]);
+  const [popupAddress,setPopupAddress]=useState(""); const [popupStartTime,setPopupStartTime]=useState("09:00"); const [popupEndTime,setPopupEndTime]=useState("17:00");
+  const [advertCta,setAdvertCta]=useState("BUY NOW"); const [advertUrl,setAdvertUrl]=useState("");
+  const [dealKind,setDealKind]=useState<DealKind>("price"); const [dealPrice,setDealPrice]=useState("");
+  const [discountPercent,setDiscountPercent]=useState(""); const [buyQuantity,setBuyQuantity]=useState(""); const [payQuantity,setPayQuantity]=useState("");
+  const [originalMetadata,setOriginalMetadata]=useState<PostMetadata|null>(null);
+  const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [deleting,setDeleting]=useState(false);
+  const [message,setMessage]=useState(""); const [notFound,setNotFound]=useState(false);
 
-  const [groupId, setGroupId] = useState("");
-  const [type, setType] = useState<PostType>("event");
+  useEffect(()=>{ if(!imageFile){setImagePreview("");return;} const u=URL.createObjectURL(imageFile);setImagePreview(u);return()=>URL.revokeObjectURL(u);},[imageFile]);
+  useEffect(()=>{const urls=updateImages.map(URL.createObjectURL);setUpdatePreviews(urls);return()=>urls.forEach(URL.revokeObjectURL);},[updateImages]);
 
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  useEffect(()=>{ async function loadPost(){
+    setLoading(true);
+    try {
+      const supabase=createClient(); const {data:{user}}=await supabase.auth.getUser();
+      if(!user){router.replace(`/log-in?next=/posts/${postId}/edit`);return;}
+      const {data,error}=await supabase.from("posts").select("id,group_id,title,content,type,image_url,event_start,event_end,expires_at,metadata").eq("id",postId).maybeSingle();
+      if(error) throw error; if(!data){setNotFound(true);return;}
+      const post=data as DatabasePost;
+      const {data:owned}=await supabase.from("groups").select("id").eq("id",post.group_id).eq("user_id",user.id).maybeSingle();
+      if(!owned){setNotFound(true);return;}
+      const loadedType=getPostType(post), dates=getSelectedDates(post);
+      setGroupId(post.group_id);setType(loadedType);setTitle(post.title??"");setBody(post.content??"");
+      setSelectedDates(loadedType==="event"||loadedType==="deal"?dates:[]);
+      setExistingImageUrl(post.image_url);setOriginalMetadata(post.metadata);
+      setExistingUpdateImages(Array.isArray(post.metadata?.image_urls)?post.metadata!.image_urls!.filter((x):x is string=>typeof x==="string"):[]);
+      setPopupAddress(post.metadata?.popup_address??"");setPopupStartTime(post.metadata?.popup_start_time??"09:00");setPopupEndTime(post.metadata?.popup_end_time??"17:00");
+      setAdvertCta(post.metadata?.advert_cta??"BUY NOW");setAdvertUrl(post.metadata?.advert_url??"");
+      setDealKind(getDealKind(post.metadata));setDealPrice(post.metadata?.deal_price!=null?String(post.metadata.deal_price):"");
+      setDiscountPercent(post.metadata?.discount_percent!=null?String(post.metadata.discount_percent):"");
+      setBuyQuantity(post.metadata?.buy_quantity!=null?String(post.metadata.buy_quantity):"");setPayQuantity(post.metadata?.pay_quantity!=null?String(post.metadata.pay_quantity):"");
+      if(dates[0]){const d=new Date(`${dates[0]}T12:00:00`);if(!Number.isNaN(d.getTime()))setMonthDate(normaliseDate(d));}
+    } catch(e){setMessage(e instanceof Error?e.message:"We couldn't load this post.");} finally{setLoading(false);}
+  } if(postId) void loadPost();},[postId,router]);
 
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [monthDate, setMonthDate] = useState(() =>
-    normaliseDate(new Date()),
-  );
+  const today=normaliseDate(new Date());
+  const calendarDays=useMemo(()=>{const y=monthDate.getFullYear(),m=monthDate.getMonth(),first=new Date(y,m,1),startDay=(first.getDay()+6)%7,start=normaliseDate(new Date(first));start.setDate(first.getDate()-startDay);return Array.from({length:42},(_,i)=>{const d=normaliseDate(new Date(start));d.setDate(start.getDate()+i);return d;});},[monthDate]);
+  const toggleDate=(d:Date)=>{const k=dateKey(d);setSelectedDates(c=>c.includes(k)?c.filter(x=>x!==k):[...c,k].sort());};
+  const removeDate=(d:string)=>setSelectedDates(c=>c.filter(x=>x!==d));
+  const goPreviousMonth=()=>{const d=new Date(monthDate);d.setMonth(d.getMonth()-1);setMonthDate(normaliseDate(d));};
+  const goNextMonth=()=>{const d=new Date(monthDate);d.setMonth(d.getMonth()+1);setMonthDate(normaliseDate(d));};
 
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(
-    null,
-  );
-  const [removeExistingImage, setRemoveExistingImage] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState("");
+  async function uploadFile(file:File){const supabase=createClient(),ext=file.name.split(".").pop()||"jpg",name=`${crypto.randomUUID()}.${ext}`;const {error}=await supabase.storage.from("post-images").upload(name,file);if(error)throw error;return supabase.storage.from("post-images").getPublicUrl(name).data.publicUrl;}
+  async function uploadImage(){if(!imageFile)return removeExistingImage?null:existingImageUrl;return uploadFile(imageFile);}
 
-  const [dealKind, setDealKind] = useState<DealKind>("price");
-  const [dealPrice, setDealPrice] = useState("");
-  const [discountPercent, setDiscountPercent] = useState("");
-  const [buyQuantity, setBuyQuantity] = useState("");
-  const [payQuantity, setPayQuantity] = useState("");
-
-  const [originalMetadata, setOriginalMetadata] =
-    useState<PostMetadata | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreview("");
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(imageFile);
-    setImagePreview(previewUrl);
-
-    return () => {
-      URL.revokeObjectURL(previewUrl);
-    };
-  }, [imageFile]);
-
-  useEffect(() => {
-    async function loadPost() {
-      setLoading(true);
-      setMessage("");
-
-      try {
-        const supabase = createClient();
-
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.replace(`/log-in?next=/posts/${postId}/edit`);
-          return;
-        }
-
-        const { data: postData, error: postError } = await supabase
-          .from("posts")
-          .select(
-            `
-              id,
-              group_id,
-              title,
-              content,
-              type,
-              image_url,
-              event_start,
-              event_end,
-              expires_at,
-              metadata
-            `,
-          )
-          .eq("id", postId)
-          .maybeSingle();
-
-        if (postError) {
-          throw postError;
-        }
-
-        if (!postData) {
-          setNotFound(true);
-          return;
-        }
-
-        const post = postData as DatabasePost;
-
-        const { data: ownedPage, error: ownershipError } = await supabase
-          .from("groups")
-          .select("id")
-          .eq("id", post.group_id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (ownershipError) {
-          throw ownershipError;
-        }
-
-        if (!ownedPage) {
-          setNotFound(true);
-          return;
-        }
-
-        const loadedType = getPostType(post);
-        const loadedDates = getSelectedDates(post);
-
-        setGroupId(post.group_id);
-        setType(loadedType);
-        setTitle(post.title ?? "");
-        setBody(post.content ?? "");
-        setSelectedDates(loadedType === "alert" ? [] : loadedDates);
-        setExistingImageUrl(post.image_url);
-        setOriginalMetadata(post.metadata);
-
-        setDealKind(getDealKind(post.metadata));
-        setDealPrice(
-          typeof post.metadata?.deal_price === "number"
-            ? String(post.metadata.deal_price)
-            : "",
-        );
-        setDiscountPercent(
-          typeof post.metadata?.discount_percent === "number"
-            ? String(post.metadata.discount_percent)
-            : "",
-        );
-        setBuyQuantity(
-          typeof post.metadata?.buy_quantity === "number"
-            ? String(post.metadata.buy_quantity)
-            : "",
-        );
-        setPayQuantity(
-          typeof post.metadata?.pay_quantity === "number"
-            ? String(post.metadata.pay_quantity)
-            : "",
-        );
-
-        if (loadedDates[0]) {
-          const firstDate = new Date(`${loadedDates[0]}T12:00:00`);
-
-          if (!Number.isNaN(firstDate.getTime())) {
-            setMonthDate(normaliseDate(firstDate));
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load post:", error);
-
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "We couldn't load this post.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (postId) {
-      void loadPost();
-    }
-  }, [postId, router]);
-
-  const today = normaliseDate(new Date());
-
-  const calendarDays = useMemo(() => {
-    const year = monthDate.getFullYear();
-    const month = monthDate.getMonth();
-
-    const firstDay = new Date(year, month, 1);
-    const startDay = (firstDay.getDay() + 6) % 7;
-
-    const start = normaliseDate(new Date(firstDay));
-    start.setDate(firstDay.getDate() - startDay);
-
-    return Array.from({ length: 42 }, (_, index) => {
-      const date = normaliseDate(new Date(start));
-      date.setDate(start.getDate() + index);
-      return date;
-    });
-  }, [monthDate]);
-
-  function toggleDate(date: Date) {
-    const key = dateKey(date);
-
-    setSelectedDates((current) =>
-      current.includes(key)
-        ? current.filter((item) => item !== key)
-        : [...current, key].sort(),
-    );
-  }
-
-  function removeDate(date: string) {
-    setSelectedDates((current) =>
-      current.filter((item) => item !== date),
-    );
-  }
-
-  function goPreviousMonth() {
-    const next = new Date(monthDate);
-    next.setMonth(next.getMonth() - 1);
-    setMonthDate(normaliseDate(next));
-  }
-
-  function goNextMonth() {
-    const next = new Date(monthDate);
-    next.setMonth(next.getMonth() + 1);
-    setMonthDate(normaliseDate(next));
-  }
-
-  function validateDeal() {
-    if (type !== "deal") {
-      return true;
-    }
-
-    if (dealKind === "price" && !dealPrice.trim()) {
-      setMessage("Add the deal price.");
-      return false;
-    }
-
-    if (dealKind === "percent" && !discountPercent.trim()) {
-      setMessage("Add the percentage off.");
-      return false;
-    }
-
-    if (
-      dealKind === "multibuy" &&
-      (!buyQuantity.trim() || !payQuantity.trim())
-    ) {
-      setMessage("Add the multibuy numbers.");
-      return false;
-    }
-
-    return true;
-  }
-
-  async function uploadImage() {
-    if (!imageFile) {
-      if (removeExistingImage) {
-        return null;
-      }
-
-      return existingImageUrl;
-    }
-
-    const supabase = createClient();
-    const fileExtension = imageFile.name.split(".").pop() || "jpg";
-    const fileName = `${crypto.randomUUID()}.${fileExtension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("post-images")
-      .upload(fileName, imageFile);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage
-      .from("post-images")
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-  }
-
-  async function savePost() {
+  async function savePost(){
     setMessage("");
-
-    if (!title.trim()) {
-      setMessage("Add a title.");
-      return;
-    }
-
-    if (type !== "alert" && selectedDates.length === 0) {
-      setMessage("Select at least one date.");
-      return;
-    }
-
-    if (!validateDeal()) {
-      return;
-    }
-
+    if(type!=="advert"&&!title.trim()){setMessage("Add a title.");return;}
+    if((type==="event"||type==="deal")&&selectedDates.length===0){setMessage("Select at least one date.");return;}
+    if(type==="popup"&&(!popupAddress.trim()||!popupStartTime||!popupEndTime)){setMessage("Add the Pop-Up address, start time and end time.");return;}
+    if(type==="advert"&&(!advertUrl.trim()||(!imageFile&&!existingImageUrl))){setMessage("Add a banner image and CTA link.");return;}
+    if(type==="deal"&&dealKind==="price"&&!dealPrice.trim()){setMessage("Add the deal price.");return;}
     setSaving(true);
-
-    try {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        router.replace(`/log-in?next=/posts/${postId}/edit`);
-        return;
-      }
-
-      const { data: ownedPage, error: ownershipError } = await supabase
-        .from("groups")
-        .select("id")
-        .eq("id", groupId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (ownershipError) {
-        throw ownershipError;
-      }
-
-      if (!ownedPage) {
-        throw new Error("You do not have permission to edit this post.");
-      }
-
-      const imageUrl =
-        type === "alert" ? null : await uploadImage();
-
-      const metadata: PostMetadata = {
-        ...(originalMetadata ?? {}),
-        active_dates: type === "alert" ? [] : selectedDates,
-        public_type: type,
-        alert_icon: type === "alert" ? "alert" : null,
-        deal_kind: type === "deal" ? dealKind : null,
-        deal_price:
-          type === "deal" && dealKind === "price"
-            ? Number(dealPrice)
-            : null,
-        discount_percent:
-          type === "deal" && dealKind === "percent"
-            ? Number(discountPercent)
-            : null,
-        buy_quantity:
-          type === "deal" && dealKind === "multibuy"
-            ? Number(buyQuantity)
-            : null,
-        pay_quantity:
-          type === "deal" && dealKind === "multibuy"
-            ? Number(payQuantity)
-            : null,
+    try{
+      const supabase=createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+      const {data:owned}=await supabase.from("groups").select("id").eq("id",groupId).eq("user_id",user.id).maybeSingle();if(!owned)throw new Error("You do not have permission to edit this post.");
+      const imageUrl=(type==="alert"||type==="update")?null:await uploadImage();
+      const newUpdateUrls=type==="update"?await Promise.all(updateImages.slice(0,Math.max(0,3-existingUpdateImages.length)).map(uploadFile)):[];
+      const updateUrls=type==="update"?[...existingUpdateImages,...newUpdateUrls].slice(0,3):[];
+      const metadata:PostMetadata={...(originalMetadata??{}),
+        active_dates:type==="event"||type==="deal"?selectedDates:type==="popup"?[dateKey(new Date())]:[],
+        public_type:type,alert_icon:type==="alert"?"alert":null,
+        deal_kind:type==="deal"?dealKind:null,deal_price:type==="deal"&&dealKind==="price"?Number(dealPrice):null,
+        discount_percent:type==="deal"&&dealKind==="percent"?Number(discountPercent):null,
+        buy_quantity:type==="deal"&&dealKind==="multibuy"?Number(buyQuantity):null,pay_quantity:type==="deal"&&dealKind==="multibuy"?Number(payQuantity):null,
+        image_urls:updateUrls,popup_address:type==="popup"?popupAddress.trim():null,popup_start_time:type==="popup"?popupStartTime:null,popup_end_time:type==="popup"?popupEndTime:null,
+        advert_cta:type==="advert"?advertCta:null,advert_url:type==="advert"?advertUrl.trim():null
       };
-
-      const { data: updatedPost, error: updateError } = await supabase
-        .from("posts")
-        .update({
-          type: type === "alert" ? "update" : type,
-          title: title.trim(),
-          content: body.trim(),
-          image_url: imageUrl,
-          event_start:
-            type === "alert" ? null : selectedDates[0] ?? null,
-          event_end:
-            type === "alert"
-              ? null
-              : selectedDates[selectedDates.length - 1] ?? null,
-          expires_at:
-            type === "alert"
-              ? new Date(
-                  Date.now() + 24 * 60 * 60 * 1000,
-                ).toISOString()
-              : null,
-          metadata,
-        })
-        .eq("id", postId)
-        .eq("group_id", groupId)
-        .select("id")
-        .maybeSingle();
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (!updatedPost) {
-        throw new Error("The post could not be updated.");
-      }
-
-      router.push("/account");
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to update post:", error);
-
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "We couldn't update this post.",
-      );
-    } finally {
-      setSaving(false);
-    }
+      let expires:string|null=null;
+      if(type==="alert"||type==="update") expires=new Date(Date.now()+86400000).toISOString();
+      if(type==="popup"){const e=new Date();const [h,m]=popupEndTime.split(":").map(Number);e.setHours(h,m,0,0);expires=e.toISOString();}
+      const {data,error}=await supabase.from("posts").update({
+        type,title:type==="advert"?"Advert":title.trim(),content:type==="advert"?"":body.trim(),image_url:imageUrl,
+        event_start:type==="event"||type==="deal"?selectedDates[0]??null:type==="popup"?dateKey(new Date()):null,
+        event_end:type==="event"||type==="deal"?selectedDates.at(-1)??null:type==="popup"?dateKey(new Date()):null,
+        expires_at:expires,metadata
+      }).eq("id",postId).eq("group_id",groupId).select("id").maybeSingle();
+      if(error)throw error;if(!data)throw new Error("The post could not be updated.");
+      router.push("/account");router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"We couldn't update this post.");}finally{setSaving(false);}
   }
 
-  async function deletePost() {
-    if (
-      deleting ||
-      !window.confirm(
-        `Delete "${title || "this post"}"? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-
-    setDeleting(true);
-    setMessage("");
-
-    try {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        router.replace(`/log-in?next=/posts/${postId}/edit`);
-        return;
-      }
-
-      const { data: ownedPage, error: ownershipError } = await supabase
-        .from("groups")
-        .select("id")
-        .eq("id", groupId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (ownershipError) {
-        throw ownershipError;
-      }
-
-      if (!ownedPage) {
-        throw new Error("You do not have permission to delete this post.");
-      }
-
-      const { data: deletedPost, error: deleteError } = await supabase
-        .from("posts")
-        .delete()
-        .eq("id", postId)
-        .eq("group_id", groupId)
-        .select("id")
-        .maybeSingle();
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      if (!deletedPost) {
-        throw new Error("The post could not be deleted.");
-      }
-
-      router.push("/account");
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to delete post:", error);
-
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "We couldn't delete this post.",
-      );
-    } finally {
-      setDeleting(false);
-    }
+  async function deletePost(){if(deleting||!window.confirm(`Delete "${type==="advert"?"this advert":title||"this post"}"? This cannot be undone.`))return;setDeleting(true);
+    try{const supabase=createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data:owned}=await supabase.from("groups").select("id").eq("id",groupId).eq("user_id",user.id).maybeSingle();if(!owned)throw new Error("You do not have permission to delete this post.");const {error}=await supabase.from("posts").delete().eq("id",postId).eq("group_id",groupId);if(error)throw error;router.push("/account");router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"We couldn't delete this post.");}finally{setDeleting(false);}
   }
 
-  const displayedImage = imagePreview
-    ? imagePreview
-    : removeExistingImage
-      ? null
-      : existingImageUrl;
+  const displayedImage=imagePreview||(!removeExistingImage?existingImageUrl:null);
+  if(loading)return <><SiteHeader/><main className="flex min-h-[65vh] items-center justify-center"><LoaderCircle className="h-8 w-8 animate-spin text-emerald-700"/></main><Footer/></>;
+  if(notFound)return <><SiteHeader/><main className="mx-auto min-h-[65vh] max-w-4xl px-5 py-20 text-center"><h1 className="text-4xl font-black">Post not found.</h1><Link href="/account" className="mt-8 inline-flex h-12 items-center rounded-2xl bg-black px-5 text-white">Back to account</Link></main><Footer/></>;
 
-  if (loading) {
-    return (
-      <>
-        <SiteHeader />
+  const types=[{value:"event",label:"Event",icon:CalendarDays},{value:"deal",label:"Deal",icon:PoundSterling},{value:"alert",label:"Alert",icon:AlertTriangle},{value:"update",label:"Update",icon:Newspaper},{value:"popup",label:"Pop-Up",icon:MapPin},{value:"advert",label:"Advert",icon:Megaphone}] as const;
 
-        <main className="flex min-h-[65vh] items-center justify-center">
-          <LoaderCircle className="h-8 w-8 animate-spin text-emerald-700" />
-        </main>
+  return <><SiteHeader/><main className="bg-white text-black">
+    <section className="border-b border-black/10"><div className="mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16"><Link href="/account" className="inline-flex items-center gap-2 text-sm font-black text-black/55"><ArrowLeft className="h-4 w-4"/>Back to account</Link><p className="mt-10 text-sm font-black uppercase tracking-[.18em] text-emerald-700">Edit Post</p><h1 className="mt-4 text-5xl font-black">Make your changes.</h1></div></section>
+    <div className="mx-auto max-w-3xl space-y-8 px-5 py-12 sm:px-8">
+      <section><h2 className="text-xl font-black">Post type</h2><div className="mt-4 grid grid-cols-3 gap-3">{types.map(item=>{const Icon=item.icon;return <button key={item.value} type="button" onClick={()=>setType(item.value)} className={`flex min-h-28 flex-col items-center justify-center rounded-2xl border p-4 ${type===item.value?"border-emerald-700 bg-emerald-700 text-white":"border-black/10"}`}><Icon className="h-6 w-6"/><span className="mt-2 text-sm font-black">{item.label}</span></button>})}</div></section>
 
-        <Footer />
-      </>
-    );
-  }
+      {type!=="advert"&&<section className="border-t border-black/10 pt-8"><label className="block text-sm font-black">Title</label><input value={title} onChange={e=>setTitle(e.target.value)} className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold"/><label className="mt-6 block text-sm font-black">Details</label><textarea value={body} onChange={e=>setBody(e.target.value)} rows={7} className="mt-3 w-full rounded-2xl border border-black/15 px-5 py-4 font-semibold"/></section>}
 
-  if (notFound) {
-    return (
-      <>
-        <SiteHeader />
+      {type==="deal"&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">Deal</h2><select value={dealKind} onChange={e=>setDealKind(e.target.value as DealKind)} className="mt-4 h-14 w-full rounded-2xl border px-5"><option value="price">Price deal</option><option value="free">Free</option><option value="percent">Percentage off</option><option value="multibuy">Multibuy</option></select>{dealKind==="price"&&<input value={dealPrice} onChange={e=>setDealPrice(e.target.value)} placeholder="5.00" className="mt-4 h-14 w-full rounded-2xl border px-5"/>}{dealKind==="percent"&&<input value={discountPercent} onChange={e=>setDiscountPercent(e.target.value)} placeholder="20" className="mt-4 h-14 w-full rounded-2xl border px-5"/>}{dealKind==="multibuy"&&<div className="mt-4 grid grid-cols-2 gap-4"><input value={buyQuantity} onChange={e=>setBuyQuantity(e.target.value)} placeholder="Buy 2" className="h-14 rounded-2xl border px-5"/><input value={payQuantity} onChange={e=>setPayQuantity(e.target.value)} placeholder="Pay 1" className="h-14 rounded-2xl border px-5"/></div>}</section>}
 
-        <main className="mx-auto min-h-[65vh] w-full max-w-4xl px-5 py-20 text-center sm:px-8">
-          <h1 className="text-4xl font-black tracking-[-0.04em]">
-            Post not found.
-          </h1>
+      {type==="popup"&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">Pop-Up details</h2><input value={popupAddress} onChange={e=>setPopupAddress(e.target.value)} placeholder="Address" className="mt-4 h-14 w-full rounded-2xl border px-5"/><div className="mt-4 grid grid-cols-2 gap-4"><input type="time" step="3600" value={popupStartTime} onChange={e=>setPopupStartTime(e.target.value)} className="h-14 rounded-2xl border px-5"/><input type="time" step="3600" value={popupEndTime} onChange={e=>setPopupEndTime(e.target.value)} className="h-14 rounded-2xl border px-5"/></div></section>}
 
-          <p className="mt-4 text-black/55">
-            This post either does not exist or does not belong to your
-            account.
-          </p>
+      {type==="advert"&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">Advert action</h2><select value={advertCta} onChange={e=>setAdvertCta(e.target.value)} className="mt-4 h-14 w-full rounded-2xl border px-5"><option>BUY NOW</option><option>BOOK NOW</option><option>LEARN MORE</option><option>VIEW WEBSITE</option><option>GET TICKETS</option><option>ORDER NOW</option><option>CONTACT US</option></select><input type="url" value={advertUrl} onChange={e=>setAdvertUrl(e.target.value)} placeholder="https://..." className="mt-4 h-14 w-full rounded-2xl border px-5"/></section>}
 
-          <Link
-            href="/account"
-            className="mt-8 inline-flex h-12 items-center justify-center rounded-2xl bg-black px-5 text-sm font-black text-white"
-          >
-            Back to account
-          </Link>
-        </main>
+      {(type==="event"||type==="deal")&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">Dates</h2><div className="mt-5 rounded-3xl bg-black/[.035] p-5"><div className="flex items-center justify-between"><button onClick={goPreviousMonth}><ChevronLeft/></button><h3 className="font-black">{monthLabel(monthDate)}</h3><button onClick={goNextMonth}><ChevronRight/></button></div><div className="mt-5 grid grid-cols-7 gap-2">{calendarDays.map(d=>{const k=dateKey(d);return <button key={k} type="button" onClick={()=>toggleDate(d)} className={`aspect-square rounded-xl text-sm font-black ${selectedDates.includes(k)?"bg-emerald-700 text-white":"bg-white"}`}>{d.getDate()}</button>})}</div></div><div className="mt-4 flex flex-wrap gap-2">{selectedDates.map(d=><button key={d} onClick={()=>removeDate(d)} className="rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black">{d} <X className="inline h-4 w-4"/></button>)}</div></section>}
 
-        <Footer />
-      </>
-    );
-  }
+      {type==="update"&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">Images</h2><p className="mt-2 text-sm text-black/50">Up to 3 images.</p><div className="mt-4 space-y-3">{existingUpdateImages.map((url,i)=><div key={url} className="relative"><Image src={url} alt="" width={900} height={600} unoptimized className="h-auto w-full rounded-2xl"/><button onClick={()=>setExistingUpdateImages(c=>c.filter((_,x)=>x!==i))} className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white"><X className="h-4 w-4"/></button></div>)}</div>{existingUpdateImages.length+updateImages.length<3&&<label className="mt-4 flex min-h-28 cursor-pointer items-center justify-center rounded-2xl border border-dashed"><input type="file" multiple accept="image/*" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);setUpdateImages(c=>[...c,...files].slice(0,3-existingUpdateImages.length));e.currentTarget.value="";}}/><ImagePlus/></label>}<div className="mt-3 grid grid-cols-3 gap-3">{updatePreviews.map((u,i)=><div key={u} className="relative aspect-square"><Image src={u} alt="" fill unoptimized className="rounded-xl object-cover"/><button onClick={()=>setUpdateImages(c=>c.filter((_,x)=>x!==i))} className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"><X className="h-4 w-4"/></button></div>)}</div></section>}
 
-  return (
-    <>
-      <SiteHeader />
+      {(type==="event"||type==="deal"||type==="popup"||type==="advert")&&<section className="border-t border-black/10 pt-8"><h2 className="text-xl font-black">{type==="advert"?"Banner image":"Image"}</h2><label className={`relative mt-5 flex cursor-pointer items-center justify-center overflow-hidden border bg-black/[.03] ${type==="advert"?"aspect-[4/1]":"aspect-[16/10] rounded-3xl"}`}><input type="file" accept="image/*" className="hidden" onChange={e=>{setImageFile(e.target.files?.[0]??null);setRemoveExistingImage(false)}}/>{displayedImage?<Image src={displayedImage} alt="" fill unoptimized className="object-cover"/>:<ImagePlus className="h-8 w-8 text-black/40"/>}</label>{displayedImage&&<button onClick={()=>{setImageFile(null);setRemoveExistingImage(true)}} className="mt-4 inline-flex gap-2 text-red-700"><Trash2 className="h-4 w-4"/>Remove image</button>}</section>}
 
-      <main className="bg-white text-black">
-        <section className="border-b border-black/10">
-          <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
-            <Link
-              href="/account"
-              className="inline-flex items-center gap-2 text-sm font-black text-black/55 transition hover:text-emerald-700"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to account
-            </Link>
-
-            <p className="mt-10 text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-              Edit Post
-            </p>
-
-            <h1 className="mt-4 text-5xl font-black leading-[0.95] tracking-[-0.055em] sm:text-6xl">
-              Make your changes.
-            </h1>
-
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-black/55">
-              Update the details, dates, deal or image attached to this post.
-            </p>
-          </div>
-        </section>
-
-        <div className="mx-auto w-full max-w-3xl space-y-8 px-5 py-12 sm:px-8 sm:py-16">
-          <section>
-            <h2 className="text-xl font-black">Post type</h2>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              {[
-                {
-                  value: "event",
-                  label: "Event",
-                  icon: CalendarDays,
-                },
-                {
-                  value: "deal",
-                  label: "Deal",
-                  icon: PoundSterling,
-                },
-                {
-                  value: "alert",
-                  label: "Alert",
-                  icon: AlertTriangle,
-                },
-              ].map((item) => {
-                const Icon = item.icon;
-                const active = type === item.value;
-
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() =>
-                      setType(item.value as PostType)
-                    }
-                    className={[
-                      "flex min-h-28 flex-col items-center justify-center rounded-2xl border p-4 text-center transition",
-                      active
-                        ? "border-emerald-700 bg-emerald-700 text-white"
-                        : "border-black/10 bg-white hover:border-black/25",
-                    ].join(" ")}
-                  >
-                    <Icon className="h-6 w-6" />
-                    <span className="mt-2 text-sm font-black">
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="border-t border-black/10 pt-8">
-            <label
-              htmlFor="post-title"
-              className="block text-sm font-black"
-            >
-              Title
-            </label>
-
-            <input
-              id="post-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={
-                type === "alert"
-                  ? "Closed today, roadworks, sold out..."
-                  : "What's happening?"
-              }
-              className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-            />
-
-            <label
-              htmlFor="post-details"
-              className="mt-6 block text-sm font-black"
-            >
-              Details
-            </label>
-
-            <textarea
-              id="post-details"
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              rows={7}
-              placeholder="Add the key details..."
-              className="mt-3 w-full resize-none rounded-2xl border border-black/15 px-5 py-4 font-semibold leading-7 outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-            />
-          </section>
-
-          {type === "deal" ? (
-            <section className="border-t border-black/10 pt-8">
-              <h2 className="text-xl font-black">Deal</h2>
-
-              <label
-                htmlFor="deal-kind"
-                className="mt-5 block text-sm font-black"
-              >
-                Deal type
-              </label>
-
-              <select
-                id="deal-kind"
-                value={dealKind}
-                onChange={(event) =>
-                  setDealKind(event.target.value as DealKind)
-                }
-                className="mt-3 h-14 w-full rounded-2xl border border-black/15 bg-white px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-              >
-                <option value="price">Price deal</option>
-                <option value="free">Free</option>
-                <option value="percent">Percentage off</option>
-                <option value="multibuy">Multibuy</option>
-              </select>
-
-              {dealKind === "price" ? (
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={dealPrice}
-                  onChange={(event) =>
-                    setDealPrice(event.target.value)
-                  }
-                  placeholder="5.00"
-                  className="mt-4 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-                />
-              ) : null}
-
-              {dealKind === "percent" ? (
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={discountPercent}
-                  onChange={(event) =>
-                    setDiscountPercent(event.target.value)
-                  }
-                  placeholder="20"
-                  className="mt-4 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-                />
-              ) : null}
-
-              {dealKind === "multibuy" ? (
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                  <input
-                    type="number"
-                    min="1"
-                    value={buyQuantity}
-                    onChange={(event) =>
-                      setBuyQuantity(event.target.value)
-                    }
-                    placeholder="Buy 2"
-                    className="h-14 rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-                  />
-
-                  <input
-                    type="number"
-                    min="1"
-                    value={payQuantity}
-                    onChange={(event) =>
-                      setPayQuantity(event.target.value)
-                    }
-                    placeholder="Pay for 1"
-                    className="h-14 rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
-                  />
-                </div>
-              ) : null}
-
-              {dealKind === "free" ? (
-                <p className="mt-4 rounded-2xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">
-                  This post will show as free.
-                </p>
-              ) : null}
-            </section>
-          ) : null}
-
-          {type !== "alert" ? (
-            <section className="border-t border-black/10 pt-8">
-              <h2 className="text-xl font-black">Dates</h2>
-
-              <div className="mt-5 rounded-3xl bg-black/[0.035] p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <button
-                    type="button"
-                    onClick={goPreviousMonth}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl bg-white transition hover:bg-black/5"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-
-                  <h3 className="text-lg font-black">
-                    {monthLabel(monthDate)}
-                  </h3>
-
-                  <button
-                    type="button"
-                    onClick={goNextMonth}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl bg-white transition hover:bg-black/5"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="mt-5 grid grid-cols-7 gap-1 text-center text-xs font-black text-black/35 sm:gap-2">
-                  <span>Mon</span>
-                  <span>Tue</span>
-                  <span>Wed</span>
-                  <span>Thu</span>
-                  <span>Fri</span>
-                  <span>Sat</span>
-                  <span>Sun</span>
-                </div>
-
-                <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-2">
-                  {calendarDays.map((date) => {
-                    const key = dateKey(date);
-                    const isCurrentMonth =
-                      date.getMonth() === monthDate.getMonth();
-                    const isSelected = selectedDates.includes(key);
-                    const isPast = date < today;
-
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => toggleDate(date)}
-                        className={[
-                          "flex aspect-square items-center justify-center rounded-xl text-xs font-black transition sm:rounded-2xl sm:text-sm",
-                          isSelected
-                            ? "bg-emerald-700 text-white"
-                            : "bg-white hover:bg-emerald-50",
-                          !isCurrentMonth && !isSelected
-                            ? "text-black/25"
-                            : "",
-                          isPast && !isSelected
-                            ? "text-black/35"
-                            : "",
-                        ].join(" ")}
-                      >
-                        {date.getDate()}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {selectedDates.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {selectedDates.map((date) => (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => removeDate(date)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-900"
-                    >
-                      {date}
-                      <X className="h-4 w-4" />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : (
-            <section className="border-t border-black/10 pt-8">
-              <div className="flex items-start gap-4 rounded-2xl bg-amber-50 px-5 py-5">
-                <Megaphone className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" />
-
-                <div>
-                  <h2 className="font-black text-amber-950">
-                    Alerts last for 24 hours.
-                  </h2>
-
-                  <p className="mt-1 text-sm leading-6 text-amber-900/70">
-                    Saving this alert will restart its 24-hour timer.
-                  </p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {type !== "alert" ? (
-            <section className="border-t border-black/10 pt-8">
-              <h2 className="text-xl font-black">Image</h2>
-
-              <label className="relative mt-5 flex aspect-[16/10] cursor-pointer items-center justify-center overflow-hidden rounded-3xl border border-black/10 bg-black/[0.03]">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => {
-                    setImageFile(event.target.files?.[0] ?? null);
-                    setRemoveExistingImage(false);
-                  }}
-                  className="hidden"
-                />
-
-                {displayedImage ? (
-                  <>
-                    <Image
-                      src={displayedImage}
-                      alt="Post image"
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-
-                    <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/70 px-4 py-3 text-center text-sm font-black text-white">
-                      Tap to replace image
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center text-black/40">
-                    <ImagePlus className="mx-auto h-8 w-8" />
-                    <p className="mt-2 text-sm font-black">Add image</p>
-                  </div>
-                )}
-              </label>
-
-              {displayedImage ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageFile(null);
-                    setRemoveExistingImage(true);
-                  }}
-                  className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-black text-red-700 transition hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove image
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-
-          {message ? (
-            <p className="rounded-2xl bg-red-50 px-5 py-4 text-sm font-bold leading-6 text-red-800">
-              {message}
-            </p>
-          ) : null}
-
-          <section className="flex flex-col gap-3 border-t border-black/10 pt-8 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => void savePost()}
-              disabled={saving || deleting}
-              className="inline-flex h-14 flex-1 items-center justify-center gap-3 rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? (
-                <LoaderCircle className="h-5 w-5 animate-spin" />
-              ) : (
-                <Check className="h-5 w-5" />
-              )}
-
-              {saving ? "Saving..." : "Save changes"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void deletePost()}
-              disabled={saving || deleting}
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl border border-red-200 px-6 text-sm font-black uppercase tracking-[0.12em] text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {deleting ? (
-                <LoaderCircle className="h-5 w-5 animate-spin" />
-              ) : (
-                <Trash2 className="h-5 w-5" />
-              )}
-
-              {deleting ? "Deleting..." : "Delete post"}
-            </button>
-          </section>
-        </div>
-      </main>
-
-      <Footer />
-    </>
-  );
+      {message&&<p className="rounded-2xl bg-red-50 px-5 py-4 text-sm font-bold text-red-800">{message}</p>}
+      <section className="flex gap-3 border-t border-black/10 pt-8"><button onClick={()=>void savePost()} disabled={saving||deleting} className="h-14 flex-1 rounded-2xl bg-emerald-700 font-black text-white">{saving?"Saving...":"Save changes"}</button><button onClick={()=>void deletePost()} disabled={saving||deleting} className="h-14 rounded-2xl border border-red-200 px-6 font-black text-red-700">{deleting?"Deleting...":"Delete post"}</button></section>
+    </div>
+  </main><Footer/></>;
 }

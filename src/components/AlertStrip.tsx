@@ -36,8 +36,7 @@ export default function AlertStrip() {
         const { data, error } = await supabase
           .from("posts")
           .select("id, title, content, expires_at, metadata")
-          .eq("type", "update")
-          .eq("metadata->>public_type", "alert")
+          .eq("type", "alert")
           .gt("expires_at", now)
           .order("created_at", { ascending: false });
 

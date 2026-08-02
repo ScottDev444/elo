@@ -13,8 +13,11 @@ import {
   ChevronRight,
   ImagePlus,
   LoaderCircle,
+  Lock,
   Megaphone,
   PoundSterling,
+  MapPin,
+  Newspaper,
   Trash2,
   X,
 } from "lucide-react";
@@ -23,7 +26,7 @@ import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
 
-type PostType = "event" | "deal" | "alert";
+type PostType = "event" | "deal" | "alert" | "update" | "popup" | "advert";
 type DealKind = "price" | "free" | "percent" | "multibuy";
 
 type PostMetadata = {
@@ -35,6 +38,12 @@ type PostMetadata = {
   discount_percent?: number | null;
   buy_quantity?: number | null;
   pay_quantity?: number | null;
+  image_urls?: string[];
+  popup_address?: string | null;
+  popup_start_time?: string | null;
+  popup_end_time?: string | null;
+  advert_cta?: string | null;
+  advert_url?: string | null;
   [key: string]: unknown;
 };
 
@@ -42,6 +51,7 @@ type DatabasePage = {
   id: string;
   name: string | null;
   user_id: string;
+  is_local_partner?: boolean | null;
 };
 
 type UserRow = {
@@ -88,6 +98,22 @@ export default function CreatePostPage() {
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [updateImages, setUpdateImages] = useState<File[]>([]);
+  const [updatePreviews, setUpdatePreviews] = useState<string[]>([]);
+  const [popupAddress, setPopupAddress] = useState("");
+  const [popupStartTime, setPopupStartTime] = useState(() => {
+    const now = new Date();
+    const hour = now.getMinutes() === 0 ? now.getHours() : (now.getHours() + 1) % 24;
+    return `${String(hour).padStart(2, "0")}:00`;
+  });
+  const [popupEndTime, setPopupEndTime] = useState(() => {
+    const now = new Date();
+    const startHour = now.getMinutes() === 0 ? now.getHours() : (now.getHours() + 1) % 24;
+    return `${String((startHour + 1) % 24).padStart(2, "0")}:00`;
+  });
+  const [advertCta, setAdvertCta] = useState("BUY NOW");
+  const [advertUrl, setAdvertUrl] = useState("");
+  const [existingAdvertId, setExistingAdvertId] = useState<string | null>(null);
 
   const [dealKind, setDealKind] = useState<DealKind>("price");
   const [dealPrice, setDealPrice] = useState("");
@@ -111,6 +137,15 @@ export default function CreatePostPage() {
       URL.revokeObjectURL(previewUrl);
     };
   }, [imageFile]);
+
+  useEffect(() => {
+    const urls = updateImages.map((file) => URL.createObjectURL(file));
+    setUpdatePreviews(urls);
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [updateImages]);
 
   useEffect(() => {
     let active = true;
@@ -146,7 +181,7 @@ export default function CreatePostPage() {
 
         let pagesQuery = supabase
           .from("groups")
-          .select("id, name, user_id")
+          .select("id, name, user_id, is_local_partner")
           .eq("status", "approved")
           .order("name", { ascending: true });
 
@@ -210,6 +245,46 @@ export default function CreatePostPage() {
       active = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadExistingAdvert() {
+      if (!groupId) {
+        setExistingAdvertId(null);
+        return;
+      }
+
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("posts")
+        .select("id, image_url, metadata")
+        .eq("group_id", groupId)
+        .eq("type", "advert")
+        .limit(1)
+        .maybeSingle();
+
+      if (!active) return;
+
+      if (error) {
+        console.error("Failed to check existing advert:", error);
+        setExistingAdvertId(null);
+        return;
+      }
+
+      setExistingAdvertId(data?.id ?? null);
+    }
+
+    void loadExistingAdvert();
+
+    return () => {
+      active = false;
+    };
+  }, [groupId]);
+
+  const selectedPostingPage = pages.find((page) => page.id === groupId);
+  const hasPremiumPostingAccess =
+    isAdmin || selectedPostingPage?.is_local_partner === true;
 
   const today = normaliseDate(new Date());
 
@@ -288,28 +363,26 @@ export default function CreatePostPage() {
     return true;
   }
 
-  async function uploadImage() {
-    if (!imageFile) {
-      return null;
-    }
-
+  async function uploadFile(file: File) {
     const supabase = createClient();
-    const fileExtension = imageFile.name.split(".").pop() || "jpg";
+    const fileExtension = file.name.split(".").pop() || "jpg";
     const fileName = `${crypto.randomUUID()}.${fileExtension}`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-images")
-      .upload(fileName, imageFile);
+      .upload(fileName, file);
 
-    if (uploadError) {
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
     const { data } = supabase.storage
       .from("post-images")
       .getPublicUrl(fileName);
 
     return data.publicUrl;
+  }
+
+  async function uploadImage() {
+    return imageFile ? uploadFile(imageFile) : null;
   }
 
   async function createPost() {
@@ -320,17 +393,40 @@ export default function CreatePostPage() {
       return;
     }
 
-    if (!title.trim()) {
+    if (type !== "advert" && !title.trim()) {
       setMessage("Add a title.");
       return;
     }
 
-    if (type !== "alert" && selectedDates.length === 0) {
+    if ((type === "event" || type === "deal") && selectedDates.length === 0) {
       setMessage("Select at least one date.");
       return;
     }
 
+    if (type === "popup" && (!popupAddress.trim() || !popupStartTime || !popupEndTime)) {
+      setMessage("Add the Pop-Up address, start time and end time.");
+      return;
+    }
+
+    if (type === "advert" && existingAdvertId) {
+      router.push(`/posts/${existingAdvertId}/edit`);
+      return;
+    }
+
+    if (type === "advert" && (!imageFile || !advertUrl.trim())) {
+      setMessage("Add a banner image and CTA link.");
+      return;
+    }
+
     if (!validateDeal()) {
+      return;
+    }
+
+    if (
+      (type === "update" || type === "popup" || type === "advert") &&
+      !hasPremiumPostingAccess
+    ) {
+      setMessage("Update, Pop-Up and Advert posts are for Local Partners and admins.");
       return;
     }
 
@@ -363,7 +459,7 @@ export default function CreatePostPage() {
 
       let pageQuery = supabase
         .from("groups")
-        .select("id, user_id")
+        .select("id, user_id, is_local_partner")
         .eq("id", groupId)
         .eq("status", "approved");
 
@@ -372,7 +468,7 @@ export default function CreatePostPage() {
       }
 
       const { data: selectedPage, error: pageError } =
-        await pageQuery.maybeSingle<Pick<DatabasePage, "id" | "user_id">>();
+        await pageQuery.maybeSingle<Pick<DatabasePage, "id" | "user_id" | "is_local_partner">>();
 
       if (pageError) {
         throw pageError;
@@ -384,11 +480,31 @@ export default function CreatePostPage() {
         );
       }
 
+      if (
+        (type === "update" || type === "popup" || type === "advert") &&
+        !admin &&
+        selectedPage.is_local_partner !== true
+      ) {
+        throw new Error(
+          "Update, Pop-Up and Advert posts are for Local Partners and admins.",
+        );
+      }
+
+      const updateImageUrls =
+        type === "update"
+          ? await Promise.all(updateImages.slice(0, 3).map(uploadFile))
+          : [];
+
       const imageUrl =
-        type === "alert" ? null : await uploadImage();
+        type === "alert" || type === "update" ? null : await uploadImage();
 
       const metadata: PostMetadata = {
-        active_dates: type === "alert" ? [] : selectedDates,
+        active_dates:
+          type === "event" || type === "deal"
+            ? selectedDates
+            : type === "popup"
+              ? [dateKey(new Date())]
+              : [],
         public_type: type,
         alert_icon: type === "alert" ? "alert" : null,
         deal_kind: type === "deal" ? dealKind : null,
@@ -408,6 +524,12 @@ export default function CreatePostPage() {
           type === "deal" && dealKind === "multibuy"
             ? Number(payQuantity)
             : null,
+        image_urls: type === "update" ? updateImageUrls : [],
+        popup_address: type === "popup" ? popupAddress.trim() : null,
+        popup_start_time: type === "popup" ? popupStartTime : null,
+        popup_end_time: type === "popup" ? popupEndTime : null,
+        advert_cta: type === "advert" ? advertCta : null,
+        advert_url: type === "advert" ? advertUrl.trim() : null,
       };
 
       const { data: createdPost, error: insertError } = await supabase
@@ -415,29 +537,58 @@ export default function CreatePostPage() {
         .insert({
           user_id: selectedPage.user_id,
           group_id: selectedPage.id,
-          type: type === "alert" ? "update" : type,
-          title: title.trim(),
-          content: body.trim(),
+          type,
+          title: type === "advert" ? "Advert" : title.trim(),
+          content: type === "advert" ? "" : body.trim(),
           image_url: imageUrl,
           event_start:
-            type === "alert" ? null : selectedDates[0] ?? null,
+            type === "event" || type === "deal"
+              ? selectedDates[0] ?? null
+              : type === "popup"
+                ? dateKey(new Date())
+                : null,
           event_end:
-            type === "alert"
-              ? null
-              : selectedDates[selectedDates.length - 1] ?? null,
+            type === "event" || type === "deal"
+              ? selectedDates[selectedDates.length - 1] ?? null
+              : type === "popup"
+                ? dateKey(new Date())
+                : null,
           expires_at:
-            type === "alert"
-              ? new Date(
-                  Date.now() + 24 * 60 * 60 * 1000,
-                ).toISOString()
-              : null,
+            type === "alert" || type === "update"
+              ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+              : type === "popup"
+                ? (() => {
+                    const expiry = new Date();
+                    const [hours, minutes] = popupEndTime.split(":").map(Number);
+                    expiry.setHours(hours, minutes, 0, 0);
+                    return expiry.toISOString();
+                  })()
+                : null,
           metadata,
         })
         .select("id")
         .single();
 
       if (insertError) {
-        throw insertError;
+        console.error("Supabase post insert failed:", {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+          type,
+          metadata,
+        });
+
+        throw new Error(
+          [
+            insertError.message,
+            insertError.details,
+            insertError.hint,
+            insertError.code ? `Code: ${insertError.code}` : "",
+          ]
+            .filter(Boolean)
+            .join(" — "),
+        );
       }
 
       router.push(`/posts/${createdPost.id}`);
@@ -445,11 +596,14 @@ export default function CreatePostPage() {
     } catch (error) {
       console.error("Failed to create post:", error);
 
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "We couldn't publish this post.",
-      );
+      const errorMessage =
+        error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : error instanceof Error
+            ? error.message
+            : "We couldn't publish this post.";
+
+      setMessage(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -481,7 +635,7 @@ export default function CreatePostPage() {
             </h1>
 
             <p className="mt-5 max-w-2xl text-lg leading-8 text-black/55">
-              Share an event, deal or alert with people across East Lothian.
+              Share something with people across East Lothian.
             </p>
           </div>
         </section>
@@ -545,49 +699,73 @@ export default function CreatePostPage() {
 
             <div className="mt-4 grid grid-cols-3 gap-3">
               {[
-                {
-                  value: "event",
-                  label: "Event",
-                  icon: CalendarDays,
-                },
-                {
-                  value: "deal",
-                  label: "Deal",
-                  icon: PoundSterling,
-                },
-                {
-                  value: "alert",
-                  label: "Alert",
-                  icon: AlertTriangle,
-                },
+                { value: "event", label: "Event", icon: CalendarDays, premium: false },
+                { value: "deal", label: "Deal", icon: PoundSterling, premium: false },
+                { value: "alert", label: "Alert", icon: AlertTriangle, premium: false },
+                { value: "update", label: "Update", icon: Newspaper, premium: true },
+                { value: "popup", label: "Pop-Up", icon: MapPin, premium: true },
+                { value: "advert", label: "Advert", icon: Megaphone, premium: true },
               ].map((item) => {
                 const Icon = item.icon;
                 const active = type === item.value;
+                const locked = item.premium && !hasPremiumPostingAccess;
 
                 return (
                   <button
                     key={item.value}
                     type="button"
-                    onClick={() =>
-                      setType(item.value as PostType)
-                    }
+                    onClick={() => {
+                      if (locked) {
+                        setMessage("LOCAL_PARTNER_UPSELL");
+                        return;
+                      }
+                      setMessage("");
+                      setType(item.value as PostType);
+                    }}
                     className={[
                       "flex min-h-28 flex-col items-center justify-center rounded-2xl border p-4 text-center transition",
                       active
                         ? "border-emerald-700 bg-emerald-700 text-white"
-                        : "border-black/10 bg-white hover:border-black/25",
+                        : locked
+                          ? "border-black/10 bg-black/[0.025] text-black/35"
+                          : "border-black/10 bg-white hover:border-black/25",
                     ].join(" ")}
                   >
-                    <Icon className="h-6 w-6" />
-                    <span className="mt-2 text-sm font-black">
-                      {item.label}
-                    </span>
+                    {locked ? <Lock className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
+                    <span className="mt-2 text-sm font-black">{item.label}</span>
+                    {item.premium ? (
+                      <span className="mt-1 text-[10px] font-black uppercase tracking-[0.1em]">
+                        {locked ? "Locked" : "Local Partner"}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
+
+            {message === "LOCAL_PARTNER_UPSELL" && !hasPremiumPostingAccess ? (
+              <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-6">
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">
+                  Become a Local Partner
+                </p>
+                <h3 className="mt-2 text-2xl font-black tracking-[-0.03em] text-emerald-950">
+                  Unlock every post type for £9.99 a month.
+                </h3>
+                <p className="mt-3 leading-7 text-emerald-950/70">
+                  Post all post types without limits, see your analytics and local trends,
+                  and get pinned higher in the feed.
+                </p>
+                <Link
+                  href="/localpartner"
+                  className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 text-sm font-black uppercase tracking-[0.1em] text-white transition hover:bg-emerald-800"
+                >
+                  Become a Local Partner
+                </Link>
+              </div>
+            ) : null}
           </section>
 
+          {type !== "advert" ? (
           <section className="border-t border-black/10 pt-8">
             <label
               htmlFor="post-title"
@@ -624,6 +802,7 @@ export default function CreatePostPage() {
               className="mt-3 w-full resize-none rounded-2xl border border-black/15 px-5 py-4 font-semibold leading-7 outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
             />
           </section>
+          ) : null}
 
           {type === "deal" ? (
             <section className="border-t border-black/10 pt-8">
@@ -712,7 +891,75 @@ export default function CreatePostPage() {
             </section>
           ) : null}
 
-          {type !== "alert" ? (
+          {type === "popup" ? (
+            <section className="border-t border-black/10 pt-8">
+              <h2 className="text-xl font-black">Pop-Up details</h2>
+              <p className="mt-2 text-sm leading-6 text-black/50">
+                Pop-Ups are for today only and disappear after the end time.
+              </p>
+              <label className="mt-5 block text-sm font-black">Address</label>
+              <input
+                value={popupAddress}
+                onChange={(event) => setPopupAddress(event.target.value)}
+                placeholder="Where is the Pop-Up?"
+                className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
+              />
+              <div className="mt-5 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-black">Starts</label>
+                  <input type="time" step="3600" value={popupStartTime} onChange={(event) => setPopupStartTime(event.target.value)}
+                    className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-black">Ends</label>
+                  <input type="time" step="3600" value={popupEndTime} onChange={(event) => setPopupEndTime(event.target.value)}
+                    className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100" />
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {type === "advert" ? (
+            <section className="border-t border-black/10 pt-8">
+              {existingAdvertId ? (
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+                  <h2 className="text-xl font-black text-emerald-950">
+                    This Page already has an advert.
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-emerald-950/70">
+                    Each Page can have one evergreen advert. Edit the existing advert instead.
+                  </p>
+                  <Link
+                    href={`/posts/${existingAdvertId}/edit`}
+                    className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 text-sm font-black text-white"
+                  >
+                    Edit advert
+                  </Link>
+                </div>
+              ) : (
+                <>
+              <h2 className="text-xl font-black">Advert action</h2>
+              <label className="mt-5 block text-sm font-black">CTA</label>
+              <select value={advertCta} onChange={(event) => setAdvertCta(event.target.value)}
+                className="mt-3 h-14 w-full rounded-2xl border border-black/15 bg-white px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100">
+                <option>BUY NOW</option>
+                <option>BOOK NOW</option>
+                <option>LEARN MORE</option>
+                <option>VIEW WEBSITE</option>
+                <option>GET TICKETS</option>
+                <option>ORDER NOW</option>
+                <option>CONTACT US</option>
+              </select>
+              <label className="mt-5 block text-sm font-black">CTA link</label>
+              <input type="url" value={advertUrl} onChange={(event) => setAdvertUrl(event.target.value)}
+                placeholder="https://..."
+                className="mt-3 h-14 w-full rounded-2xl border border-black/15 px-5 font-semibold outline-none transition focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100" />
+                </>
+              )}
+            </section>
+          ) : null}
+
+          {type === "event" || type === "deal" ? (
             <section className="border-t border-black/10 pt-8">
               <h2 className="text-xl font-black">Dates</h2>
 
@@ -799,48 +1046,89 @@ export default function CreatePostPage() {
                 </div>
               ) : null}
             </section>
-          ) : (
+          ) : type === "alert" ? (
             <section className="border-t border-black/10 pt-8">
               <div className="flex items-start gap-4 rounded-2xl bg-amber-50 px-5 py-5">
                 <Megaphone className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" />
-
                 <div>
-                  <h2 className="font-black text-amber-950">
-                    Alerts last for 24 hours.
-                  </h2>
-
+                  <h2 className="font-black text-amber-950">Alerts last for 24 hours.</h2>
                   <p className="mt-1 text-sm leading-6 text-amber-900/70">
                     This alert will automatically expire 24 hours after it is published.
                   </p>
                 </div>
               </div>
             </section>
-          )}
-
-          {type !== "alert" ? (
+          ) : type === "update" ? (
             <section className="border-t border-black/10 pt-8">
-              <h2 className="text-xl font-black">Image</h2>
+              <p className="rounded-2xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">
+                Updates are long-form posts, can include up to 3 images, and stay on the feed for 24 hours.
+              </p>
+            </section>
+          ) : type === "advert" ? (
+            <section className="border-t border-black/10 pt-8">
+              <p className="rounded-2xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">
+                Adverts are evergreen and remain available until removed.
+              </p>
+            </section>
+          ) : null}
 
-              <label className="relative mt-5 flex aspect-[16/10] cursor-pointer items-center justify-center overflow-hidden rounded-3xl border border-black/10 bg-black/[0.03]">
+          {type === "update" ? (
+            <section className="border-t border-black/10 pt-8">
+              <h2 className="text-xl font-black">Images</h2>
+              <p className="mt-2 text-sm leading-6 text-black/50">Add up to 3 images.</p>
+              <label className="mt-5 flex min-h-32 cursor-pointer items-center justify-center rounded-3xl border border-dashed border-black/15 bg-black/[0.025]">
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={(event) => {
-                    setImageFile(event.target.files?.[0] ?? null);
+                    const chosen = Array.from(event.target.files ?? []);
+                    setUpdateImages((current) => [...current, ...chosen].slice(0, 3));
+                    event.currentTarget.value = "";
                   }}
                   className="hidden"
                 />
-
+                <div className="text-center text-black/40">
+                  <ImagePlus className="mx-auto h-8 w-8" />
+                  <p className="mt-2 text-sm font-black">Choose up to 3 images</p>
+                </div>
+              </label>
+              {updatePreviews.length ? (
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  {updatePreviews.map((preview, index) => (
+                    <div key={preview} className="relative aspect-square overflow-hidden rounded-2xl bg-black/[0.03]">
+                      <Image src={preview} alt={`Update image ${index + 1}`} fill unoptimized className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setUpdateImages((current) =>
+                            current.filter((_, imageIndex) => imageIndex !== index),
+                          )
+                        }
+                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white"
+                        aria-label={`Remove image ${index + 1}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : type !== "alert" && !(type === "advert" && existingAdvertId) ? (
+            <section className="border-t border-black/10 pt-8">
+              <h2 className="text-xl font-black">{type === "advert" ? "Banner image" : "Image"}</h2>
+              {type === "advert" ? (
+                <p className="mt-2 text-sm leading-6 text-black/50">Choose a wide banner image for the advert.</p>
+              ) : null}
+              <label className={[
+                "relative mt-5 flex cursor-pointer items-center justify-center overflow-hidden rounded-3xl border border-black/10 bg-black/[0.03]",
+                type === "advert" ? "aspect-[4/1]" : "aspect-[16/10]",
+              ].join(" ")}>
+                <input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} className="hidden" />
                 {displayedImage ? (
                   <>
-                    <Image
-                      src={displayedImage}
-                      alt="Post image"
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-
+                    <Image src={displayedImage} alt="Post image" fill unoptimized className="object-cover" />
                     <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/70 px-4 py-3 text-center text-sm font-black text-white">
                       Tap to replace image
                     </div>
@@ -848,27 +1136,20 @@ export default function CreatePostPage() {
                 ) : (
                   <div className="text-center text-black/40">
                     <ImagePlus className="mx-auto h-8 w-8" />
-                    <p className="mt-2 text-sm font-black">Add image</p>
+                    <p className="mt-2 text-sm font-black">{type === "advert" ? "Add banner" : "Add image"}</p>
                   </div>
                 )}
               </label>
-
               {displayedImage ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageFile(null);
-                  }}
-                  className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-black text-red-700 transition hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove image
+                <button type="button" onClick={() => setImageFile(null)}
+                  className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-black text-red-700 transition hover:bg-red-50">
+                  <Trash2 className="h-4 w-4" /> Remove image
                 </button>
               ) : null}
             </section>
           ) : null}
 
-          {message ? (
+          {message && message !== "LOCAL_PARTNER_UPSELL" ? (
             <p className="rounded-2xl bg-red-50 px-5 py-4 text-sm font-bold leading-6 text-red-800">
               {message}
             </p>

@@ -25,6 +25,12 @@ type PostMetadata = {
   buy_quantity?: number | null;
   pay_quantity?: number | null;
   discount_percent?: number | null;
+  image_urls?: string[] | null;
+  popup_address?: string | null;
+  popup_start_time?: string | null;
+  popup_end_time?: string | null;
+  advert_cta?: string | null;
+  advert_url?: string | null;
 };
 
 type CardMetadata = {
@@ -38,6 +44,12 @@ type CardMetadata = {
   buy_quantity?: number | null;
   pay_quantity?: number | null;
   discount_percent?: number | null;
+  image_urls?: string[] | null;
+  popup_address?: string | null;
+  popup_start_time?: string | null;
+  popup_end_time?: string | null;
+  advert_cta?: string | null;
+  advert_url?: string | null;
 };
 
 type DatabasePost = {
@@ -99,7 +111,7 @@ type DisplayPost = {
   id: string;
   category: string;
   colour: PostColour;
-  type: "event" | "deal" | "post";
+  type: "event" | "deal" | "update" | "popup" | "advert" | "post";
   title: string;
   description: string;
   href: string;
@@ -772,12 +784,18 @@ function mapPost(
   const type = getPostType(post);
   const normalisedType = type.toLowerCase();
 
-  const cardType: "event" | "deal" | "post" =
+  const cardType: DisplayPost["type"] =
     normalisedType === "event"
       ? "event"
       : normalisedType === "deal"
         ? "deal"
-        : "post";
+        : normalisedType === "update"
+          ? "update"
+          : normalisedType === "popup"
+            ? "popup"
+            : normalisedType === "advert"
+              ? "advert"
+              : "post";
 
   const group = post.group_id
     ? groups.get(post.group_id)
@@ -818,6 +836,18 @@ function mapPost(
       post.metadata?.pay_quantity ?? null,
     discount_percent:
       post.metadata?.discount_percent ?? null,
+    image_urls:
+      post.metadata?.image_urls ?? null,
+    popup_address:
+      post.metadata?.popup_address ?? null,
+    popup_start_time:
+      post.metadata?.popup_start_time ?? null,
+    popup_end_time:
+      post.metadata?.popup_end_time ?? null,
+    advert_cta:
+      post.metadata?.advert_cta ?? null,
+    advert_url:
+      post.metadata?.advert_url ?? null,
   };
 
   const upcomingDates =
@@ -841,15 +871,19 @@ function mapPost(
     type: cardType,
     title: post.title,
 
-    description: getFirstSentence(
-      post.content ?? "",
-    ),
+    description:
+      normalisedType === "update"
+        ? post.content ?? ""
+        : getFirstSentence(post.content ?? ""),
 
     href: `/posts/${post.id}`,
 
-    imageUrl: displayImage
-      ? post.image_url ?? undefined
-      : undefined,
+    imageUrl:
+      normalisedType === "advert" || normalisedType === "popup"
+        ? post.image_url ?? undefined
+        : displayImage
+          ? post.image_url ?? undefined
+          : undefined,
 
     date: nextActiveDate,
 
@@ -858,6 +892,7 @@ function mapPost(
     postedBy: group?.name,
 
     location:
+      post.metadata?.popup_address ??
       post.metadata?.location ??
       undefined,
 
@@ -869,7 +904,9 @@ function mapPost(
     featured,
 
     isLocalPartner:
-      group?.isLocalPartner ?? false,
+      normalisedType === "advert"
+        ? true
+        : group?.isLocalPartner ?? false,
 
     createdAt:
       post.created_at ??
@@ -877,7 +914,9 @@ function mapPost(
 
     sortDate:
       nextActiveDate ??
-      "9999-12-31",
+      (post.created_at
+        ? post.created_at.slice(0, 10)
+        : getLocalDateString()),
   };
 }
 
@@ -949,59 +988,156 @@ function getFirstName(
   );
 }
 
+function shuffleArray<T>(items: T[]) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [
+      shuffled[randomIndex],
+      shuffled[index],
+    ];
+  }
+
+  return shuffled;
+}
+
+function spreadUpdates(posts: DisplayPost[]) {
+  const updates = posts.filter((post) => post.type === "update");
+  const regular = posts.filter((post) => post.type !== "update");
+
+  if (updates.length === 0) {
+    return regular;
+  }
+
+  if (regular.length === 0) {
+    return updates;
+  }
+
+  const result: DisplayPost[] = [];
+  let updateIndex = 0;
+
+  regular.forEach((post, index) => {
+    result.push(post);
+
+    if ((index + 1) % 3 === 0 && updateIndex < updates.length) {
+      result.push(updates[updateIndex]);
+      updateIndex += 1;
+    }
+  });
+
+  while (updateIndex < updates.length) {
+    result.push(updates[updateIndex]);
+    updateIndex += 1;
+  }
+
+  return result;
+}
+
 function createFeedItems(
   posts: DisplayPost[],
   places: DatabasePlace[],
 ): FeedItem[] {
   const items: FeedItem[] = [];
 
+  const adverts = shuffleArray(
+    posts.filter((post) => post.type === "advert"),
+  );
+
+  const popups = shuffleArray(
+    posts.filter((post) => post.type === "popup"),
+  );
+
+  const organicPosts = spreadUpdates(
+    posts.filter(
+      (post) => post.type !== "advert" && post.type !== "popup",
+    ),
+  );
+
   const openPlaces = shufflePlaces(
     places.filter((place) => isPlaceOpenNow(place)),
   );
 
+  let advertIndex = 0;
+  let popupIndex = 0;
   let placeIndex = 0;
-  let postsSincePlace = 0;
-  let nextPlaceAfter = 3;
+  let organicSinceAdvert = 0;
+  let organicSincePlaceLike = 0;
+  let nextPlaceLikeAfter = 3;
 
-  posts.forEach((post, index) => {
+  const addPost = (post: DisplayPost) => {
     items.push({
       kind: "post",
-      key: `post-${post.id}`,
+      key: `post-${post.id}-${items.length}`,
       post,
-      animationIndex:
-        items.length,
+      animationIndex: items.length,
     });
+  };
 
-    postsSincePlace += 1;
+  const addPlaceLike = () => {
+    const hasPopup = popupIndex < popups.length;
+    const hasPlace = placeIndex < openPlaces.length;
 
-    const shouldInsertPlace =
-      placeIndex <
-        openPlaces.length &&
-      postsSincePlace >=
-        nextPlaceAfter &&
-      index < posts.length - 1;
-
-    if (!shouldInsertPlace) {
+    if (!hasPopup && !hasPlace) {
       return;
     }
 
-    const place =
-      openPlaces[placeIndex];
+    // Alternate where possible, but randomise which one starts each page load.
+    const sequenceIndex = popupIndex + placeIndex;
+    const popupFirst = Math.random() < 0.5;
+    const preferPopup =
+      sequenceIndex % 2 === 0 ? popupFirst : !popupFirst;
+
+    if ((preferPopup && hasPopup) || !hasPlace) {
+      addPost(popups[popupIndex]);
+      popupIndex += 1;
+      return;
+    }
+
+    const place = openPlaces[placeIndex];
 
     items.push({
       kind: "place",
-      key: `place-${place.id}`,
+      key: `place-${place.id}-${items.length}`,
       place,
-      animationIndex:
-        items.length,
+      animationIndex: items.length,
     });
 
     placeIndex += 1;
-    postsSincePlace = 0;
+  };
 
-    nextPlaceAfter =
-      nextPlaceAfter === 3 ? 5 : 3;
+  organicPosts.forEach((post) => {
+    addPost(post);
+    organicSinceAdvert += 1;
+    organicSincePlaceLike += 1;
+
+    if (
+      organicSincePlaceLike >= nextPlaceLikeAfter &&
+      (popupIndex < popups.length || placeIndex < openPlaces.length)
+    ) {
+      addPlaceLike();
+      organicSincePlaceLike = 0;
+      nextPlaceLikeAfter = nextPlaceLikeAfter === 3 ? 4 : 3;
+    }
+
+    if (
+      organicSinceAdvert >= 7 &&
+      adverts.length > 0
+    ) {
+      // Cycle only after every available advert has had one appearance.
+      addPost(adverts[advertIndex % adverts.length]);
+      advertIndex += 1;
+      organicSinceAdvert = 0;
+    }
   });
+
+  // Don't bury remaining temporary pop-ups: mix any leftovers with remaining places.
+  while (
+    popupIndex < popups.length ||
+    placeIndex < openPlaces.length
+  ) {
+    addPlaceLike();
+  }
 
   return items;
 }
@@ -1164,22 +1300,26 @@ export default function HomePosts() {
           []) as DatabasePlace[];
 
       const filteredPosts =
-        databasePosts.filter(
-          (post) =>
-            post.metadata !== null &&
-            Boolean(
-              post.metadata
-                .public_type,
-            ) &&
-            Array.isArray(
-              post.metadata
-                .active_dates,
-            ) &&
-            post.metadata
-              .active_dates.length >
-              0 &&
-            isPostActive(post),
-        );
+        databasePosts.filter((post) => {
+          const postType = getPostType(post).toLowerCase();
+
+          // Alerts are displayed exclusively by AlertStrip.
+          if (postType === "alert") {
+            return false;
+          }
+
+          if (
+            postType !== "event" &&
+            postType !== "deal" &&
+            postType !== "update" &&
+            postType !== "popup" &&
+            postType !== "advert"
+          ) {
+            return false;
+          }
+
+          return isPostActive(post);
+        });
 
       const groupIds = [
         ...new Set(
@@ -1427,6 +1567,10 @@ export default function HomePosts() {
                           metadata={
                             item.post
                               .metadata
+                          }
+                          imageUrl={
+                            item.post
+                              .imageUrl
                           }
                           title={
                             item.post
