@@ -36,39 +36,39 @@ const stripePromise = loadStripe(
 const benefits = [
   {
     icon: BarChart3,
-    title: "Analytics",
+    title: "Understand what works",
     description:
-      "Access useful insights about how your Page is performing.",
+      "See useful Page analytics so you can understand how people are finding and engaging with you.",
   },
   {
     icon: LineChart,
-    title: "Local trends",
+    title: "See what locals want",
     description:
-      "See what people across East Lothian are searching for.",
+      "Use Local Trends to see what people across East Lothian are searching for right now.",
   },
   {
     icon: Megaphone,
-    title: "More post types",
+    title: "Share more",
     description:
-      "Unlock extra ways to share useful updates with the community.",
+      "Unlock extra post types so you have more ways to keep local people updated and interested.",
   },
   {
     icon: ArrowUp,
-    title: "Higher feed placement",
+    title: "Get more visibility",
     description:
-      "Local Partner posts are given greater visibility in the main feed.",
+      "Local Partner posts are placed above standard posts, giving your updates stronger visibility in the main feed.",
   },
   {
     icon: BadgeCheck,
-    title: "Verified badge",
+    title: "Stand out as a Partner",
     description:
-      "Show people that your Page is an official ELO Local Partner.",
+      "Your verified Local Partner badge makes your Page easy to recognise across East Lothian Online.",
   },
   {
     icon: Headphones,
-    title: "Priority support",
+    title: "Get priority support",
     description:
-      "Get quicker help when you need support with your Page or posts.",
+      "Get quicker help when you need support with your Page, posts or Local Partner features.",
   },
 ];
 
@@ -184,14 +184,14 @@ export default function LocalPartnerPage() {
               </p>
 
               <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[0.94] tracking-[-0.06em] sm:text-6xl lg:text-7xl">
-                Support local.
+                Put your business
                 <br />
-                Stand out locally.
+                in front of more locals.
               </h1>
 
               <p className="mt-7 max-w-2xl text-lg leading-8 text-black/60">
-                Become an ELO Local Partner and unlock more tools inside
-                East Lothian Online.
+                Get greater visibility, better insights and more ways to
+                reach people across East Lothian — all from your existing Page.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -199,7 +199,7 @@ export default function LocalPartnerPage() {
                   href="#join"
                   className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800"
                 >
-                  Become a Partner
+                  Upgrade my Page
                   <ArrowRight className="h-5 w-5" />
                 </a>
 
@@ -224,7 +224,7 @@ export default function LocalPartnerPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-bold text-black/50">
-                    Built for local businesses
+                    More visibility. More insight. More ways to post.
                   </p>
                 </div>
               </div>
@@ -232,10 +232,6 @@ export default function LocalPartnerPage() {
               <div className="mt-8">
                 <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
                   <span className="text-5xl font-black tracking-[-0.05em]">
-                    £9.99
-                  </span>
-
-                  <span className="pb-1 text-xl font-black text-black/35 line-through">
                     £19.99
                   </span>
 
@@ -245,28 +241,23 @@ export default function LocalPartnerPage() {
                 </div>
 
                 <p className="mt-3 text-sm font-black text-emerald-700">
-                  Early bird price for the first 10 Local Partners.
+                  Upgrade your Page and start using every Local Partner benefit.
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-black/55">
-                  Extra tools for your East Lothian Online Page, with more
-                  benefits still to come.
-                </p>
-
-                <p className="mt-3 text-sm leading-6 text-black/55">
-                  Future benefits, including things like Partner merchandise,
-                  will also be given retrospectively to existing Local
-                  Partners.
+                  Built for East Lothian businesses and organisations that want
+                  to be easier to discover, understand what locals are looking
+                  for and get more from every post.
                 </p>
               </div>
 
               <div className="mt-8 space-y-4 border-t border-emerald-200 pt-7">
                 {[
-                  "Analytics",
-                  "Local trends",
-                  "More post types",
-                  "Higher feed placement",
-                  "Verified badge",
+                  "Higher placement in the main feed",
+                  "Page analytics",
+                  "Local search trends",
+                  "Extra Partner-only post types",
+                  "Verified Local Partner badge",
                   "Priority support",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-3">
@@ -290,12 +281,13 @@ export default function LocalPartnerPage() {
               </p>
 
               <h2 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-                More than a badge.
+                Make your Page work harder.
               </h2>
 
               <p className="mt-5 text-lg leading-8 text-black/60">
-                Local Partnership gives your Page extra tools directly
-                inside East Lothian Online.
+                Local Partnership is designed to help you get noticed, learn
+                what your local audience wants and give them more reasons to
+                engage with your Page.
               </p>
             </div>
 
@@ -348,16 +340,16 @@ export default function LocalPartnerPage() {
               </p>
 
               <p className="mt-5 text-lg leading-8 text-black/65">
-                Money from Local Partnership helps us be present at markets and
-                events, meet more local people and businesses, improve the
-                platform, and expand what East Lothian Online can do for the
-                whole area.
+                Local Partnership also directly supports the continued growth
+                of East Lothian Online — helping us improve the platform, meet
+                more local people and businesses, and bring more of East
+                Lothian into one useful place.
               </p>
 
               <p className="mt-5 text-lg leading-8 text-black/65">
-                Supporting ELO means helping us spend more time building,
-                attending community events and making local information easier
-                for everyone to find.
+                The stronger ELO becomes, the more useful your Local Partner
+                presence becomes too. Your subscription helps us keep building
+                the local audience and tools your Page can benefit from.
               </p>
             </div>
           </div>
@@ -367,11 +359,11 @@ export default function LocalPartnerPage() {
           <div className="mx-auto w-full max-w-4xl px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
             <div className="text-center">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Join today
+                Become a Local Partner
               </p>
 
               <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-                Choose which Page becomes a Local Partner.
+                Upgrade your Page for £19.99 per month.
               </h2>
             </div>
 
@@ -438,7 +430,7 @@ export default function LocalPartnerPage() {
                       onClick={() => setCheckoutOpen(true)}
                       className="mt-6 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800"
                     >
-                      Continue to payment
+                      Upgrade for £19.99/month
                     </button>
                   ) : null}
 
