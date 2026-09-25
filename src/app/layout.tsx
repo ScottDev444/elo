@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+import EmeraldBar from "@/components/EmeraldBar";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,8 +37,11 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
-      <body className="min-h-screen bg-emerald-700 font-sans antialiased">
+      <body className="min-h-screen bg-[#F4F5F4] font-sans antialiased">
         {children}
+
+        <EmeraldBar />
+
         <Analytics />
         <SpeedInsights />
       </body>
