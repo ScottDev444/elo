@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChevronLeft,
@@ -68,6 +69,7 @@ function formatTime(value: string | null) {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const [today, setToday] = useState<Date | null>(null);
@@ -467,7 +469,13 @@ export default function CalendarPage() {
                   <WebFeedPostCard
                     key={post.id}
                     post={post}
-                    onClick={() => {}}
+                    onClick={() =>
+                      router.push(
+                        `/posts/${encodeURIComponent(
+                          post.id
+                        )}`
+                      )
+                    }
                   />
                 ))}
               </div>
