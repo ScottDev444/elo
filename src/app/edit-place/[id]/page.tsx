@@ -27,7 +27,7 @@ import {
 import SiteHeader from "@/components/SiteHeader";
 import { createClient } from "@/lib/supabase/client";
 
-const IMAGE_BUCKET = "place-images";
+const IMAGE_BUCKET = "post-images";
 const MAX_IMAGES = 3;
 
 const DAYS = [

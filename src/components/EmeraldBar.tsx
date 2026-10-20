@@ -32,7 +32,7 @@ const ITEMS: NavItem[] = [
   {
     key: "post",
     label: "Post",
-    href: "/create",
+    href: "/post",
   },
   {
     key: "saved",
@@ -55,11 +55,11 @@ function IconFor({
 }) {
   const common = {
     size: item === "post" ? 29 : 24,
-    strokeWidth: active ? 2.6 : 2.1,
+    strokeWidth: active ? 2.5 : 2.1,
   };
 
   if (item === "feed") {
-    return <Home {...common} />;
+    return <Home {...common} fill={active ? "currentColor" : "none"} />;
   }
 
   if (item === "search") {
@@ -67,14 +67,19 @@ function IconFor({
   }
 
   if (item === "post") {
-    return <CirclePlus {...common} />;
+    return <CirclePlus {...common} fill={active ? "currentColor" : "none"} />;
   }
 
   if (item === "saved") {
-    return <Bookmark {...common} />;
+    return <Bookmark {...common} fill={active ? "currentColor" : "none"} />;
   }
 
-  return <CalendarDays {...common} />;
+  return (
+    <CalendarDays
+      {...common}
+      fill={active ? "currentColor" : "none"}
+    />
+  );
 }
 
 function routeIsActive(pathname: string, item: NavItem) {
@@ -98,10 +103,7 @@ export default function EmeraldBar() {
 
     async function checkPostAccess(userId?: string) {
       if (!userId) {
-        if (active) {
-          setCanPost(false);
-        }
-
+        if (active) setCanPost(false);
         return;
       }
 
@@ -113,16 +115,10 @@ export default function EmeraldBar() {
         .limit(1)
         .maybeSingle();
 
-      if (!active) {
-        return;
-      }
+      if (!active) return;
 
       if (error) {
-        console.error(
-          "Emerald bar Page check failed:",
-          error
-        );
-
+        console.error("Emerald bar Page check failed:", error);
         setCanPost(false);
         return;
       }
@@ -131,39 +127,26 @@ export default function EmeraldBar() {
     }
 
     async function loadInitialAccess() {
-      const { data, error } =
-        await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
 
-      if (!active) {
-        return;
-      }
+      if (!active) return;
 
       if (error) {
-        console.error(
-          "Emerald bar session check failed:",
-          error
-        );
-
+        console.error("Emerald bar session check failed:", error);
         setCanPost(false);
         return;
       }
 
-      await checkPostAccess(
-        data.session?.user.id
-      );
+      await checkPostAccess(data.session?.user.id);
     }
 
     void loadInitialAccess();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        void checkPostAccess(
-          session?.user.id
-        );
-      }
-    );
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void checkPostAccess(session?.user.id);
+    });
 
     return () => {
       active = false;
@@ -171,17 +154,21 @@ export default function EmeraldBar() {
     };
   }, [supabase]);
 
+  const hideOnAuthPage =
+    pathname === "/log-in" ||
+    pathname === "/sign-up";
+
+  if (hideOnAuthPage) {
+    return null;
+  }
+
   const visibleItems = ITEMS.filter(
-    (item) =>
-      item.key !== "post" || canPost
+    (item) => item.key !== "post" || canPost
   );
 
   return (
     <>
-      <nav
-        className="elo-emerald-bar-wrap"
-        aria-label="Primary"
-      >
+      <nav className="elo-emerald-bar-wrap" aria-label="Primary">
         <div className="elo-emerald-bar">
           <svg
             className="elo-emerald-shards"
@@ -191,90 +178,35 @@ export default function EmeraldBar() {
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <polygon
-              points="0,0 70,0 42,38 0,50"
-              fill="#006F57"
-            />
+            <polygon points="0,0 70,0 42,38 0,50" fill="#006F57" />
+            <polygon points="70,0 145,0 115,34 42,38" fill="#00906C" />
+            <polygon points="145,0 220,0 185,44 115,34" fill="#007A5E" />
+            <polygon points="220,0 300,0 270,34 185,44" fill="#009A72" />
+            <polygon points="300,0 400,0 400,41 270,34" fill="#00745A" />
 
-            <polygon
-              points="70,0 145,0 115,34 42,38"
-              fill="#00906C"
-            />
+            <polygon points="0,50 42,38 90,70 0,70" fill="#008A68" />
+            <polygon points="42,38 115,34 145,70 90,70" fill="#007258" />
+            <polygon points="115,34 185,44 215,70 145,70" fill="#00946E" />
+            <polygon points="185,44 270,34 300,70 215,70" fill="#007B5E" />
+            <polygon points="270,34 400,41 400,70 300,70" fill="#008B68" />
 
-            <polygon
-              points="145,0 220,0 185,44 115,34"
-              fill="#007A5E"
-            />
-
-            <polygon
-              points="220,0 300,0 270,34 185,44"
-              fill="#009A72"
-            />
-
-            <polygon
-              points="300,0 400,0 400,41 270,34"
-              fill="#00745A"
-            />
-
-            <polygon
-              points="0,50 42,38 90,70 0,70"
-              fill="#008A68"
-            />
-
-            <polygon
-              points="42,38 115,34 145,70 90,70"
-              fill="#007258"
-            />
-
-            <polygon
-              points="115,34 185,44 215,70 145,70"
-              fill="#00946E"
-            />
-
-            <polygon
-              points="185,44 270,34 300,70 215,70"
-              fill="#007B5E"
-            />
-
-            <polygon
-              points="270,34 400,41 400,70 300,70"
-              fill="#008B68"
-            />
-
-            <polygon
-              points="70,0 115,34 42,38"
-              fill="#00A078"
-            />
-
-            <polygon
-              points="220,0 270,34 185,44"
-              fill="#008362"
-            />
+            <polygon points="70,0 115,34 42,38" fill="#00A078" />
+            <polygon points="220,0 270,34 185,44" fill="#008362" />
           </svg>
 
           <div className="elo-emerald-items">
             {visibleItems.map((item) => {
-              const active =
-                routeIsActive(
-                  pathname,
-                  item
-                );
+              const active = routeIsActive(pathname, item);
 
               return (
                 <Link
                   key={item.key}
                   href={item.href}
                   className={`elo-emerald-item ${
-                    active
-                      ? "is-active"
-                      : ""
+                    active ? "is-active" : ""
                   }`}
                   aria-label={item.label}
-                  aria-current={
-                    active
-                      ? "page"
-                      : undefined
-                  }
+                  aria-current={active ? "page" : undefined}
                 >
                   <span className="elo-emerald-icon">
                     <IconFor
@@ -297,10 +229,7 @@ export default function EmeraldBar() {
           z-index: 1000;
           left: 0;
           right: 0;
-          bottom: max(
-            8px,
-            env(safe-area-inset-bottom)
-          );
+          bottom: max(8px, env(safe-area-inset-bottom));
           padding: 0 18px;
           pointer-events: none;
         }
@@ -314,9 +243,7 @@ export default function EmeraldBar() {
           overflow: hidden;
           border-radius: 22px;
           background: #008564;
-          box-shadow:
-            0 5px 12px
-            rgba(0, 0, 0, .18);
+          box-shadow: 0 5px 12px rgba(0,0,0,.18);
           pointer-events: auto;
         }
 
@@ -345,8 +272,7 @@ export default function EmeraldBar() {
           justify-content: center;
           color: #FFFFFF;
           text-decoration: none;
-          -webkit-tap-highlight-color:
-            transparent;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .elo-emerald-icon {
@@ -367,22 +293,17 @@ export default function EmeraldBar() {
           background: transparent;
         }
 
-        .elo-emerald-item.is-active
-        .elo-emerald-active-line {
+        .elo-emerald-item.is-active .elo-emerald-active-line {
           background: #FFFFFF;
-          box-shadow:
-            0 0 5px
-            rgba(255, 255, 255, .65);
+          box-shadow: 0 0 5px rgba(255,255,255,.65);
         }
 
         .elo-emerald-item:hover {
-          background:
-            rgba(255, 255, 255, .055);
+          background: rgba(255,255,255,.055);
         }
 
         .elo-emerald-item:focus-visible {
-          outline:
-            2px solid #FFFFFF;
+          outline: 2px solid #FFFFFF;
           outline-offset: -5px;
           border-radius: 14px;
         }

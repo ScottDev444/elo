@@ -184,11 +184,7 @@ export default function SiteHeader({ onOpenNotifications }: SiteHeaderProps = {}
             onClick={() => onOpenNotifications ? onOpenNotifications() : setNotificationsOpen(open => !open)}>
             <ShardButton icon="notifications" unreadCount={unreadCount} />
           </button>
-        ) : (
-          <Link href="/log-in" className="elo-action elo-right" aria-label="Sign in to view notifications">
-            <ShardButton icon="notifications" />
-          </Link>
-        )}
+        ) : null}
         {userId && notificationsOpen && (
           <div ref={panelRef} id="elo-notifications" className="elo-notifications"
             role="region" aria-label="Notifications">
@@ -212,7 +208,7 @@ export default function SiteHeader({ onOpenNotifications }: SiteHeaderProps = {}
       </div>
       <style>{`
         .elo-header {
-          position: sticky; top: 0; z-index: 50; flex-shrink: 0;
+          position: relative; flex-shrink: 0;
           background: #F4F5F4; padding-top: env(safe-area-inset-top, 0px);
         }
         .elo-content {

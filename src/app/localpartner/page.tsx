@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   EmbeddedCheckout,
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 
 import SiteHeader from "@/components/SiteHeader";
-import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
 
 type OwnedPage = {
@@ -35,40 +33,40 @@ const stripePromise = loadStripe(
 
 const benefits = [
   {
-    icon: BarChart3,
-    title: "Understand what works",
+    icon: ArrowUp,
+    title: "Stand out on the noticeboard",
     description:
-      "See useful Page analytics so you can understand how people are finding and engaging with you.",
+      "Local Partner posts are placed above standard posts, giving your notices stronger visibility across ELO.",
+  },
+  {
+    icon: BarChart3,
+    title: "See how your Page performs",
+    description:
+      "Use Page analytics to understand how local people are finding and engaging with your presence on ELO.",
   },
   {
     icon: LineChart,
-    title: "See what locals want",
+    title: "See what locals are looking for",
     description:
-      "Use Local Trends to see what people across East Lothian are searching for right now.",
+      "Use Local Trends to see what people across East Lothian are searching for and turn that insight into better posts.",
   },
   {
     icon: Megaphone,
-    title: "Share more",
+    title: "Post more kinds of notices",
     description:
-      "Unlock extra post types so you have more ways to keep local people updated and interested.",
-  },
-  {
-    icon: ArrowUp,
-    title: "Get more visibility",
-    description:
-      "Local Partner posts are placed above standard posts, giving your updates stronger visibility in the main feed.",
+      "Unlock extra Local Partner post types so your Page has more ways to share useful, timely and promotional content.",
   },
   {
     icon: BadgeCheck,
-    title: "Stand out as a Partner",
+    title: "Be clearly recognised",
     description:
-      "Your verified Local Partner badge makes your Page easy to recognise across East Lothian Online.",
+      "Your verified Local Partner badge helps your Page stand out and be recognised across East Lothian Online.",
   },
   {
     icon: Headphones,
     title: "Get priority support",
     description:
-      "Get quicker help when you need support with your Page, posts or Local Partner features.",
+      "Get quicker help with your Page, posts and Local Partner features when you need it.",
   },
 ];
 
@@ -175,236 +173,173 @@ export default function LocalPartnerPage() {
     <>
       <SiteHeader />
 
-      <main className="bg-white text-black">
-        <section className="border-b border-black/10">
-          <div className="mx-auto grid w-full max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:px-12 lg:py-28">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Local Partnership
-              </p>
+      <main className="min-h-screen bg-[#F4F5F4] text-[#17221F]">
+        <section className="mx-auto w-full max-w-[760px] px-[18px] pb-28 pt-6 sm:pt-8">
+          <header className="pb-5">
+            <div className="text-[9px] font-black uppercase tracking-[1.3px] text-[#005744]">
+              ELO LOCAL PARTNER
+            </div>
 
-              <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[0.94] tracking-[-0.06em] sm:text-6xl lg:text-7xl">
-                Put your business
-                <br />
-                in front of more locals.
-              </h1>
+            <h1 className="mt-2 max-w-[620px] text-[34px] font-black leading-[1.02] tracking-[-1.1px] text-[#111614] sm:text-[42px]">
+              Stand out on East Lothian&apos;s
+              <br />
+              digital noticeboard.
+            </h1>
 
-              <p className="mt-7 max-w-2xl text-lg leading-8 text-black/60">
-                Get greater visibility, better insights and more ways to
-                reach people across East Lothian — all from your existing Page.
-              </p>
+            <p className="mt-4 max-w-[630px] text-[14px] leading-6 text-[#68736F] sm:text-[15px]">
+              Put your Page in a stronger position across ELO. Get your
+              notices seen sooner, understand what locals are looking for and
+              unlock more ways to post.
+            </p>
+          </header>
 
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="#join"
-                  className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800"
+          <section className="overflow-hidden rounded-[24px] bg-[#005744] p-5 text-white shadow-[0_16px_40px_rgba(0,87,68,0.16)] sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[15px] bg-white/12">
+                <BadgeCheck size={25} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] font-black uppercase tracking-[1.2px] text-white/65">
+                  LOCAL PARTNER
+                </div>
+
+                <h2 className="mt-1 text-[20px] font-black tracking-[-0.4px]">
+                  More from every notice
+                </h2>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-end gap-x-3">
+              <span className="text-[48px] font-black leading-none tracking-[-2.2px]">
+                £19.99
+              </span>
+
+              <span className="pb-1 text-[13px] font-bold text-white/70">
+                per month
+              </span>
+            </div>
+
+            <p className="mt-3 max-w-[560px] text-[13px] leading-5 text-white/78">
+              Give your Page stronger visibility across the noticeboard,
+              better local insight and more ways to keep East Lothian updated.
+            </p>
+
+            <a
+              href="#join"
+              className="mt-6 flex h-[54px] w-full items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-[13px] font-black text-[#005744] transition hover:bg-[#F2F7F5]"
+            >
+              Become a Local Partner
+              <ArrowRight size={18} />
+            </a>
+          </section>
+
+          <section className="mt-8">
+            <div className="text-[9px] font-black uppercase tracking-[1.3px] text-[#005744]">
+              WHAT YOU GET
+            </div>
+
+            <h2 className="mt-2 text-[27px] font-black leading-8 tracking-[-0.7px] text-[#111614]">
+              More ways to stand out, post and understand your local audience.
+            </h2>
+
+            <div className="mt-4 overflow-hidden rounded-[20px] border border-[#D6DDDA] bg-white">
+              {benefits.map(({ icon: Icon, title, description }, index) => (
+                <article
+                  key={title}
+                  className={`flex gap-3 p-4 sm:p-5 ${
+                    index !== benefits.length - 1
+                      ? "border-b border-[#E3E7E5]"
+                      : ""
+                  }`}
                 >
-                  Upgrade my Page
-                  <ArrowRight className="h-5 w-5" />
-                </a>
-
-                <a
-                  href="mailto:eastlothian.online@outlook.com"
-                  className="inline-flex h-14 items-center justify-center rounded-2xl border border-black/15 px-6 text-sm font-black transition hover:border-black/30 hover:bg-black/[0.03]"
-                >
-                  Ask a question
-                </a>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-7 sm:p-9">
-              <div className="flex items-center gap-3">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-700 text-white">
-                  <BadgeCheck className="h-6 w-6" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.15em] text-emerald-700">
-                    ELO Local Partner
-                  </p>
-
-                  <p className="mt-1 text-sm font-bold text-black/50">
-                    More visibility. More insight. More ways to post.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-                  <span className="text-5xl font-black tracking-[-0.05em]">
-                    £19.99
-                  </span>
-
-                  <span className="pb-1 text-sm font-bold text-black/45">
-                    per month
-                  </span>
-                </div>
-
-                <p className="mt-3 text-sm font-black text-emerald-700">
-                  Upgrade your Page and start using every Local Partner benefit.
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-black/55">
-                  Built for East Lothian businesses and organisations that want
-                  to be easier to discover, understand what locals are looking
-                  for and get more from every post.
-                </p>
-              </div>
-
-              <div className="mt-8 space-y-4 border-t border-emerald-200 pt-7">
-                {[
-                  "Higher placement in the main feed",
-                  "Page analytics",
-                  "Local search trends",
-                  "Extra Partner-only post types",
-                  "Verified Local Partner badge",
-                  "Priority support",
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-700 text-white">
-                      <Check className="h-4 w-4" />
-                    </div>
-
-                    <p className="font-bold">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border-b border-black/10">
-          <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
-            <div className="max-w-3xl">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                What you get
-              </p>
-
-              <h2 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-                Make your Page work harder.
-              </h2>
-
-              <p className="mt-5 text-lg leading-8 text-black/60">
-                Local Partnership is designed to help you get noticed, learn
-                what your local audience wants and give them more reasons to
-                engage with your Page.
-              </p>
-            </div>
-
-            <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-black/10 bg-black/10 sm:grid-cols-2 lg:grid-cols-3">
-              {benefits.map(({ icon: Icon, title, description }) => (
-                <article key={title} className="bg-white p-7 sm:p-8">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
-                    <Icon className="h-6 w-6" />
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-[#EAF4F0] text-[#005744]">
+                    <Icon size={21} />
                   </div>
 
-                  <h3 className="mt-6 text-xl font-black tracking-[-0.03em]">
-                    {title}
-                  </h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[13px] font-black text-[#1C2925]">
+                      {title}
+                    </h3>
 
-                  <p className="mt-3 leading-7 text-black/55">
-                    {description}
-                  </p>
+                    <p className="mt-1 text-[11px] leading-[17px] text-[#74807C]">
+                      {description}
+                    </p>
+                  </div>
+
+                  <Check
+                    size={17}
+                    className="mt-1 shrink-0 text-[#005744]"
+                  />
                 </article>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-
-        <section className="border-b border-black/10 bg-emerald-50">
-          <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-12 lg:py-20">
-            <div className="overflow-hidden rounded-3xl bg-emerald-100">
-              <Image
-                src="/ETHANEILIDH.jpg"
-                alt="Ethan and Eilidh"
-                width={1200}
-                height={900}
-                className="h-auto w-full object-cover"
-              />
+          <section
+            id="join"
+            className="mt-8 scroll-mt-24 rounded-[24px] border border-[#C8D7D1] bg-white p-5 shadow-[0_12px_32px_rgba(23,34,31,0.06)] sm:p-6"
+          >
+            <div className="text-[9px] font-black uppercase tracking-[1.3px] text-[#005744]">
+              BECOME A LOCAL PARTNER
             </div>
 
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Our mission
-              </p>
+            <h2 className="mt-2 text-[27px] font-black leading-8 tracking-[-0.7px] text-[#111614]">
+              Put your Page at the heart of the noticeboard.
+            </h2>
 
-              <h2 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-                Built by Ethan &amp; Eilidh.
-              </h2>
+            <p className="mt-3 text-[12px] leading-[19px] text-[#68736F]">
+              Become a Local Partner for £19.99 per month and unlock the full
+              set of Partner benefits for your approved Page.
+            </p>
 
-              <p className="mt-6 text-lg leading-8 text-black/65">
-                We are building East Lothian Online to give the community one
-                simple digital home for local events, deals, alerts, businesses
-                and useful information.
-              </p>
-
-              <p className="mt-5 text-lg leading-8 text-black/65">
-                Local Partnership also directly supports the continued growth
-                of East Lothian Online — helping us improve the platform, meet
-                more local people and businesses, and bring more of East
-                Lothian into one useful place.
-              </p>
-
-              <p className="mt-5 text-lg leading-8 text-black/65">
-                The stronger ELO becomes, the more useful your Local Partner
-                presence becomes too. Your subscription helps us keep building
-                the local audience and tools your Page can benefit from.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section id="join">
-          <div className="mx-auto w-full max-w-4xl px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
-            <div className="text-center">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Become a Local Partner
-              </p>
-
-              <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-                Upgrade your Page for £19.99 per month.
-              </h2>
-            </div>
-
-            <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mt-5 border-t border-[#E2E7E4] pt-5">
               {loadingPages ? (
-                <p className="text-center font-bold text-black/50">
-                  Loading your Pages...
-                </p>
+                <div className="flex min-h-[120px] items-center justify-center">
+                  <span className="text-[12px] font-bold text-[#74807C]">
+                    Loading your Pages...
+                  </span>
+                </div>
               ) : !signedIn ? (
-                <div className="text-center">
-                  <p className="text-lg font-black">
-                    Sign in to continue.
+                <div className="rounded-[16px] bg-[#F4F5F4] p-4 text-center">
+                  <p className="text-[14px] font-black text-[#1C2925]">
+                    Sign in to upgrade a Page.
                   </p>
 
                   <Link
                     href="/log-in?next=/localpartner"
-                    className="mt-5 inline-flex h-12 items-center justify-center rounded-xl bg-emerald-700 px-6 text-sm font-black text-white"
+                    className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[13px] bg-[#005744] px-5 text-[12px] font-black text-white"
                   >
                     Sign in
+                    <ArrowRight size={17} />
                   </Link>
                 </div>
               ) : availablePages.length === 0 ? (
-                <div className="text-center">
-                  <p className="text-lg font-black">
-                    You need an approved Page that is not already a Local Partner.
+                <div className="rounded-[16px] bg-[#F4F5F4] p-4 text-center">
+                  <p className="text-[14px] font-black text-[#1C2925]">
+                    No eligible Pages yet.
+                  </p>
+
+                  <p className="mx-auto mt-2 max-w-[430px] text-[11px] leading-[17px] text-[#74807C]">
+                    You need an approved Page that is not already a Local
+                    Partner.
                   </p>
 
                   <Link
                     href="/create-page"
-                    className="mt-5 inline-flex h-12 items-center justify-center rounded-xl bg-emerald-700 px-6 text-sm font-black text-white"
+                    className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[13px] bg-[#005744] px-5 text-[12px] font-black text-white"
                   >
                     Create a Page
+                    <ArrowRight size={17} />
                   </Link>
                 </div>
               ) : (
                 <>
                   <label
                     htmlFor="partner-page"
-                    className="block text-sm font-black"
+                    className="text-[12px] font-black text-[#1C2925]"
                   >
-                    Select Page
+                    Page to upgrade
                   </label>
 
                   <select
@@ -415,7 +350,7 @@ export default function LocalPartnerPage() {
                       setCheckoutOpen(false);
                       setMessage("");
                     }}
-                    className="mt-3 h-14 w-full rounded-2xl border border-black/15 bg-white px-4 font-bold outline-none focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-2 h-[54px] w-full rounded-[14px] border border-[#D5DCDA] bg-[#F8F9F8] px-4 text-[13px] font-bold text-[#17221F] outline-none transition focus:border-[#005744]"
                   >
                     {availablePages.map((page) => (
                       <option key={page.id} value={page.id}>
@@ -428,14 +363,15 @@ export default function LocalPartnerPage() {
                     <button
                       type="button"
                       onClick={() => setCheckoutOpen(true)}
-                      className="mt-6 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-emerald-700 px-6 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-emerald-800"
+                      className="mt-4 flex h-[56px] w-full items-center justify-center gap-2 rounded-[14px] border-0 bg-[#005744] px-5 text-[13px] font-black text-white transition hover:bg-[#004B3A]"
                     >
-                      Upgrade for £19.99/month
+                      Become a Local Partner · £19.99/month
+                      <ArrowRight size={18} />
                     </button>
                   ) : null}
 
                   {checkoutOpen && selectedPageId ? (
-                    <div className="mt-6 overflow-hidden rounded-2xl border border-black/10">
+                    <div className="mt-5 overflow-hidden rounded-[16px] border border-[#D6DDDA] bg-white">
                       <EmbeddedCheckoutProvider
                         key={selectedPageId}
                         stripe={stripePromise}
@@ -449,16 +385,24 @@ export default function LocalPartnerPage() {
               )}
 
               {message ? (
-                <p className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+                <p className="mt-4 rounded-[13px] bg-[#FDECEA] px-4 py-3 text-[11px] font-bold leading-[17px] text-[#A52B21]">
                   {message}
                 </p>
               ) : null}
             </div>
+          </section>
+
+          <div className="mt-5 text-center">
+            <a
+              href="mailto:eastlothian.online@outlook.com"
+              className="text-[11px] font-bold text-[#68736F] underline decoration-[#AAB6B1] underline-offset-4"
+            >
+              Have a question before upgrading?
+            </a>
           </div>
         </section>
       </main>
 
-      <Footer />
     </>
   );
 }
