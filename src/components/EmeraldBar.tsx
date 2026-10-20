@@ -32,7 +32,7 @@ const ITEMS: NavItem[] = [
   {
     key: "post",
     label: "Post",
-    href: "/post",
+    href: "/create",
   },
   {
     key: "saved",
